@@ -1,5 +1,6 @@
 # GoFlash
 
+<!-- markdownlint-disable-next-line MD033 -->
 <img src="./public/images/logo.svg" alt="GoFlash Logo" width="100" height="100" />
 
 A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.
@@ -38,12 +39,13 @@ A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics yo
   - [Contents](#contents)
   - [Features](#features)
     - [Performance highlights](#performance-highlights)
-  - [Why goflash vs Gin/Fiber](#why-goflash-vs-ginfiber)
+  - [Why `GoFlash` vs Gin/Fiber/Others](#why-goflash-vs-ginfiberothers)
     - [Key differences and rationale](#key-differences-and-rationale)
   - [Install](#install)
   - [Quick Start](#quick-start)
   - [Core Concepts](#core-concepts)
     - [Routing](#routing)
+      - [Pattern reference\*\*](#pattern-reference)
     - [Context (Ctx)](#context-ctx)
     - [Mounting/Interop](#mountinginterop)
       - [Mounting http.Handler or ServeMux](#mounting-httphandler-or-servemux)
@@ -103,11 +105,11 @@ A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics yo
 
 ---
 
-## Why goflash vs Gin/Fiber
+## Why `GoFlash` vs Gin/Fiber/Others
 
-goflash is designed to combine the best of Gin and Fiber, while addressing their key limitations for modern, professional Go development:
+GoFlash is designed to combine the best of Gin and Fiber, while addressing their key limitations for modern, professional Go development:
 
-| Capability                  | Gin           | Fiber                 | goflash                               |
+| Capability                  | Gin           | Fiber                 | GoFlash                               |
 | --------------------------- | ------------- | --------------------- | ------------------------------------- |
 | net/http compatible         | ✅ Yes         | ❌ No (fasthttp)       | ✅ Yes                                 |
 | HTTP/2 readiness            | ✅ Yes         | ❌ No (adapter needed) | ✅ Yes                                 |
@@ -127,15 +129,15 @@ goflash is designed to combine the best of Gin and Fiber, while addressing their
 
 ### Key differences and rationale
 
-- **Standard library compatibility:** goflash is 100% net/http, so you get HTTP/2+, context cancellation, and all Go ecosystem tools out of the box—no adapters, no surprises.
-- **Performance without trade-offs:** Like Fiber, goflash uses pooling and zero-allocation patterns, but never sacrifices reliability or compatibility. You get near-Fiber speed with Gin-level safety.
-- **Minimal, ergonomic API:** Inspired by Fiber’s expressiveness and Gin’s clarity, goflash offers a small, explicit API—no magic, no global state, no hidden costs.
+- **Standard library compatibility:** GoFlash is 100% net/http, so you get HTTP/2+, context cancellation, and all Go ecosystem tools out of the box—no adapters, no surprises.
+- **Performance without trade-offs:** Like Fiber, GoFlash uses pooling and zero-allocation patterns, but never sacrifices reliability or compatibility. You get near-Fiber speed with Gin-level safety.
+- **Minimal, ergonomic API:** Inspired by Fiber’s expressiveness and Gin’s clarity, GoFlash offers a small, explicit API—no magic, no global state, no hidden costs.
 - **Batteries-included, but modular:** All common middleware (logging, recovery, CORS, tracing, sessions, gzip, rate limit, buffer) are built-in and opt-in. You only pay for what you use.
 - **Observability and production readiness:** OpenTelemetry tracing, structured logging, and context helpers are first-class, not afterthoughts. Graceful shutdown and error handling are built-in.
 - **Extensible and future-proof:** Designed for microservices, monoliths, and serverless. Clean project structure, easy to add your own middleware, and ready for new Go features (e.g., generics, slog).
 - **Professional developer experience:** Clear docs, real-world examples, and a focus on explicitness and safety. No hidden magic, no global state, and no “gotchas” for teams scaling up.
 
-> Note 📎: goflash is for teams who want the speed and ergonomics of Fiber, the reliability and compatibility of Gin, and the flexibility to build anything from microservices to large-scale backends—without compromise.
+> Note 📎: GoFlash is for teams who want the speed and ergonomics of Fiber, the reliability and compatibility of Gin, and the flexibility to build anything from microservices to large-scale backends—without compromise.
 
 ---
 
@@ -187,7 +189,8 @@ func main() {
 - Custom methods: use `Handle(method, path, handler)` for non-standard verbs.
 - Mount net/http handlers with `Mount` or `HandleHTTP`.
 
-> Pattern reference
+#### Pattern reference**
+
 Routing patterns and behavior follow julienschmidt/httprouter. See:
 
 - Named params: <https://github.com/julienschmidt/httprouter#named-parameters>
@@ -232,11 +235,11 @@ flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request
 
 ### Mounting/Interop
 
-goflash is designed for seamless interoperability with the entire Go HTTP ecosystem. You can mount any `http.Handler`, `http.ServeMux`, or compatible router directly into your goflash app, making it easy to:
+GoFlash is designed for seamless interoperability with the entire Go HTTP ecosystem. You can mount any `http.Handler`, `http.ServeMux`, or compatible router directly into your GoFlash app, making it easy to:
 
 - Incrementally migrate legacy net/http codebases
 - Integrate third-party routers, middleware, or microservices
-- Share routes and handlers between goflash and standard library servers
+- Share routes and handlers between GoFlash and standard library servers
 
 #### Mounting http.Handler or ServeMux
 
@@ -274,16 +277,16 @@ app.HandleHTTP("GET", "/status", http.HandlerFunc(func(w http.ResponseWriter, r 
 
 #### Migration and Interop Patterns
 
-- **Incremental migration:** Start by mounting your existing `http.ServeMux` or legacy handlers, then gradually move routes to goflash for improved ergonomics and middleware support.
+- **Incremental migration:** Start by mounting your existing `http.ServeMux` or legacy handlers, then gradually move routes to GoFlash for improved ergonomics and middleware support.
 - **Third-party integration:** Use `Mount` or `HandleHTTP` to plug in routers or handlers from other libraries (e.g., Prometheus, pprof, grpc-gateway) without adapters.
-- **Full net/http compatibility:** goflash apps are themselves `http.Handler`, so you can embed them in other servers, reverse proxies, or test harnesses.
+- **Full net/http compatibility:** GoFlash apps are themselves `http.Handler`, so you can embed them in other servers, reverse proxies, or test harnesses.
 
 #### Advanced: Composing with net/http
 
-You can use goflash as a sub-router in a larger net/http application, or vice versa:
+You can use GoFlash as a sub-router in a larger net/http application, or vice versa:
 
 ```go
-// Use goflash as a sub-router in a standard net/http mux
+// Use GoFlash as a sub-router in a standard net/http mux
 app := flash.New()
 // ...register routes...
 mux := http.NewServeMux()
@@ -291,11 +294,11 @@ mux.Handle("/api/", http.StripPrefix("/api", app))
 log.Fatal(http.ListenAndServe(":8080", mux))
 ```
 
-> Interop 🔗: goflash is designed for zero-friction interop: no adapters, no wrappers, just standard Go interfaces. This makes it ideal for gradual adoption, microservices, and complex architectures.
+> Interop 🔗: GoFlash is designed for zero-friction interop: no adapters, no wrappers, just standard Go interfaces. This makes it ideal for gradual adoption, microservices, and complex architectures.
 
 ### Logging
 
-- goflash uses Go's standard slog for framework logging.
+- GoFlash uses Go's standard slog for framework logging.
 - Provide your own logger via `app.SetLogger(*slog.Logger)`.
 - Middlewares pull the logger from request context.
 
@@ -307,25 +310,26 @@ app.Use(mw.Logger())
 
 Adapters
 
-- You can plug zap/zerolog via slog-compatible handlers (community adapters), keeping the goflash API stable.
+- You can plug zap/zerolog via slog-compatible handlers (community adapters), keeping the GoFlash API stable.
 
 ---
 
 ## Built-in Middleware
 
-| Middleware                            | Purpose                                                                 | Key Options                                                                                                              |
-| ------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [Logger](middleware/logger.go)        | Simple request logging                                                  | —                                                                                                                        |
-| [Recover](middleware/recover.go)      | Panic safety to 500                                                     | —                                                                                                                        |
-| [CORS](middleware/cors.go)            | Cross-origin rules                                                      | `Origins`, `Methods`, `Headers`, `Credentials`                                                                           |
-| [Timeout](middleware/timeout.go)      | Per-route deadline                                                      | `Duration`, custom timeout handler                                                                                       |
-| [OpenTelemetry](middleware/otel.go)   | Server spans + attributes + status mapping                              | `Tracer`, `Propagator`, `Filter`, `SpanName`, `Attributes`, `Status`, `RecordDuration`, `ServiceName`, `ExtraAttributes` |
-| [Sessions](middleware/session.go)     | Cookie or header session ID, in-memory store                            | `TTL`, `CookieName`, `HeaderName`, etc.                                                                                  |
-| [Gzip](middleware/gzip.go)            | Response compression with pooled writers                                | `Level`                                                                                                                  |
-| [Request ID](middleware/requestid.go) | Ensure/echo request ID header and put into context                      | `Header` (default `X-Request-ID`)                                                                                        |
-| [Rate Limit](middleware/ratelimit.go) | Token bucket per client IP                                              | `Limiter`, `Header` (Retry-After)                                                                                        |
-| [Buffer](middleware/buffer.go)        | Pooled write buffer; sets Content-Length; auto-stream on large payloads | `InitialSize`, `MaxSize`                                                                                                 |
-| [CSRF](middleware/csrf.go)            | Double-submit cookie CSRF protection (optional)                         | `CookieName`, `HeaderName`, `TokenLength`, `TTL`, etc.                                                                   |
+| Middleware                                     | Purpose                                                                 | Key Options                                                                                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| [Logger](middleware/logger.go)                 | Simple request logging                                                  | —                                                                                                                        |
+| [Recover](middleware/recover.go)               | Panic safety to 500                                                     | —                                                                                                                        |
+| [CORS](middleware/cors.go)                     | Cross-origin rules                                                      | `Origins`, `Methods`, `Headers`, `Credentials`                                                                           |
+| [Timeout](middleware/timeout.go)               | Per-route deadline                                                      | `Duration`, custom timeout handler                                                                                       |
+| [OpenTelemetry](middleware/otel.go)            | Server spans + attributes + status mapping                              | `Tracer`, `Propagator`, `Filter`, `SpanName`, `Attributes`, `Status`, `RecordDuration`, `ServiceName`, `ExtraAttributes` |
+| [Sessions](middleware/session.go)              | Cookie or header session ID, in-memory store                            | `TTL`, `CookieName`, `HeaderName`, etc.                                                                                  |
+| [Gzip](middleware/gzip.go)                     | Response compression with pooled writers                                | `Level`                                                                                                                  |
+| [Request ID](middleware/requestid.go)          | Ensure/echo request ID header and put into context                      | `Header` (default `X-Request-ID`)                                                                                        |
+| [Rate Limit](middleware/ratelimit.go)          | Token bucket per client IP                                              | `Limiter`, `Header` (Retry-After)                                                                                        |
+| [Buffer](middleware/buffer.go)                 | Pooled write buffer; sets Content-Length; auto-stream on large payloads | `InitialSize`, `MaxSize`                                                                                                 |
+| [CSRF](middleware/csrf.go)                     | Double-submit cookie CSRF protection (optional)                         | `CookieName`, `HeaderName`, `TokenLength`, `TTL`, etc.                                                                   |
+| [Validator I18n](middleware/validator_i18n.go) | Per-request localized validation messages                               | `DefaultLocale`, `LocaleFromCtx`, `MessageFuncFor` (required), `SetGlobal`                                               |
 
 ### Usage
 
