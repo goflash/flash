@@ -1,7 +1,7 @@
 # GoFlash
 
 <!-- markdownlint-disable-next-line MD033 -->
-<img src="./public/images/logo.svg" alt="GoFlash Logo" width="100" height="100" />
+<img src="./public/images/logo-wide.png" alt="GoFlash Logo" />
 
 A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.
 
@@ -45,7 +45,7 @@ A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics yo
   - [Quick Start](#quick-start)
   - [Core Concepts](#core-concepts)
     - [Routing](#routing)
-      - [Pattern reference\*\*](#pattern-reference)
+      - [Pattern reference](#pattern-reference)
     - [Context (Ctx)](#context-ctx)
     - [Mounting/Interop](#mountinginterop)
       - [Mounting http.Handler or ServeMux](#mounting-httphandler-or-servemux)
@@ -189,7 +189,7 @@ func main() {
 - Custom methods: use `Handle(method, path, handler)` for non-standard verbs.
 - Mount net/http handlers with `Mount` or `HandleHTTP`.
 
-#### Pattern reference**
+#### Pattern reference
 
 Routing patterns and behavior follow julienschmidt/httprouter. See:
 
