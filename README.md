@@ -1,6 +1,6 @@
 # GoFlash
 
-![GoFlash Logo](./public/images/logo.svg)
+<img src="./public/images/logo.svg" alt="GoFlash Logo" width="100" height="100" />
 
 A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.
 

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goflash/goflash/validate"
+	"github.com/goflash/flash/validate"
 	"github.com/julienschmidt/httprouter"
 	ms "github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
