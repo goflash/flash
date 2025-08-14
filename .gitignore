@@ -1,0 +1,63 @@
+# Go build artifacts
+*.a
+*.o
+
+# Compiled binaries and shared objects
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries and coverage/profiles
+*.test
+*.out
+*.cover
+*.cov
+coverage.out
+cover.out
+profile.out
+*.prof
+*.pprof
+cpu.profile
+mem.profile
+trace.out
+
+# Build/output directories
+bin/
+build/
+dist/
+out/
+tmp/
+coverage/
+
+# Logs
+*.log
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.iml
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+.Spotlight-V100
+.Trashes
+._*
+
+# Env files (keep examples)
+.env
+.env.*
+!.env.example
+
+# Dependencies (uncomment if you do NOT commit vendor)
+vendor/
+tmp/
