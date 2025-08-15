@@ -515,7 +515,7 @@ func Test_findExpectedFieldType_VariousBranches(t *testing.T) {
 	type T struct {
 		Age        int    `json:"age,omitempty"`
 		Skip       string `json:"-"`
-		unexported int    `json:"secret"`
+		unexported int    // intentionally unexported; should be ignored
 		Name       string
 	}
 	// reference the unexported field to avoid unused-field linter warnings
@@ -613,4 +613,26 @@ func TestBindJSON_Mapstructure_NewDecoderError(t *testing.T) {
 	err := c.BindJSON(&v, BindJSONOptions{ErrorUnused: true}) // triggers flexible path
 	require.Error(t, err)
 	assert.Equal(t, "decoder boom", err.Error())
+}
+
+// New tests for Set/Get helpers
+func TestCtx_SetGet(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	var c Ctx
+	c.Reset(rec, req, nil, "/")
+
+	// missing with no default -> nil
+	if got := c.Get("k"); got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+	// missing with default -> default
+	if got := c.Get("k", "def"); got != "def" {
+		t.Fatalf("expected default, got %v", got)
+	}
+	// set -> read
+	c.Set("k", "v")
+	if got := c.Get("k", "def"); got != "v" {
+		t.Fatalf("expected 'v', got %v", got)
+	}
 }

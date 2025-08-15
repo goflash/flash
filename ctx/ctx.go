@@ -66,6 +66,30 @@ func (c *Ctx) WroteHeader() bool { return c.wroteHeader }
 // Context returns the request context.Context.
 func (c *Ctx) Context() context.Context { return c.r.Context() }
 
+// Set stores a value in the request context using the provided key.
+// It replaces the request with a clone that carries the new context.
+//
+// Note: Prefer using a custom, unexported key type to avoid collisions.
+func (c *Ctx) Set(key, value any) *Ctx {
+	ctx := context.WithValue(c.Context(), key, value)
+	c.SetRequest(c.Request().WithContext(ctx))
+	return c
+}
+
+// Get returns a value from the request context by key.
+// If the key is not present (or the stored value is nil), it returns the provided default
+// when given (Get(key, def)), otherwise it returns nil.
+func (c *Ctx) Get(key any, def ...any) any {
+	v := c.Context().Value(key)
+	if v != nil {
+		return v
+	}
+	if len(def) > 0 {
+		return def[0]
+	}
+	return nil
+}
+
 // Method returns the HTTP method for the request.
 func (c *Ctx) Method() string { return c.r.Method }
 

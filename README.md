@@ -63,8 +63,6 @@ A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics yo
   - [Performance Notes](#performance-notes)
   - [All Examples](#all-examples)
   - [Benchmarks](#benchmarks)
-    - [Tips (macOS)](#tips-macos)
-    - [Commands](#commands)
   - [Contributing](#contributing)
 
 ---
@@ -210,6 +208,8 @@ flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request
 | `SetResponseWriter(w)`       | Replace the underlying http.ResponseWriter (e.g., for gzip or buffer middleware).                  |
 | `WroteHeader()`              | Reports whether the response header has been written.                                              |
 | `Context()`                  | Returns the request context for cancellation, deadlines, tracing, etc.                             |
+| `Set(key, value)`            | Store a value on the request context (clones request with context.WithValue).                      |
+| `Get(key [,def])`            | Retrieve a value from the request context; returns def if provided and missing, else nil.          |
 | `Method()`                   | Returns the HTTP method (GET, POST, etc).                                                          |
 | `Path()`                     | Returns the request URL path.                                                                      |
 | `Route()`                    | Returns the matched route pattern (e.g., `/users/:id`).                                            |
@@ -227,11 +227,6 @@ flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request
 | `Reset(w, r, ps, route)`     | Internal: resets the context for pooling (not for user code).                                      |
 
 > All methods are designed for explicitness, safety, and performance. You always have access to the underlying http types for advanced use, but the ergonomic helpers cover 99% of use cases.
-
-> Note 🔍: `BindJSON` is strict by default (unknown fields rejected). You can opt into flexible decoding per-call:
->
-> - `BindJSON(&v, ctx.BindJSONOptions{WeaklyTypedInput: true})` to coerce common types (e.g., "10" -> 10)
-> - `BindJSON(&v, ctx.BindJSONOptions{ErrorUnused: true})` to error on unexpected fields
 
 ### Mounting/Interop
 
@@ -489,18 +484,30 @@ cd examples/websocket && go run .
 
 ## Benchmarks
 
-### Tips (macOS)
+We benchmarked GoFlash against Gin and Fiber across a representative set of scenarios:
 
-- Disable logging middleware while benchmarking
-- Prefer `wrk` or keep-alive with `ab`
-- Use `127.0.0.1` explicitly and consider `ulimit -n 65535`
+1. Simple ping/pong endpoint
+2. Reading a URL path parameter
+3. Writing to and reading from request context
+4. JSON binding with validation
+5. Trailing-wildcard route parsing
+6. Basic route group
+7. Route groups nested 10 levels deep
+8. Single middleware
+9. Chain of 10 middlewares
 
-### Commands
+Environment and methodology:
 
-```bash
-wrk -t8 -c200 -d30s http://127.0.0.1:8080/
-ab -k -n 500000 -c 100 http://127.0.0.1:8080/
-```
+- Hardware: Apple MacBook Pro (M3, 32 GB RAM)
+- Load generator: wrk with 11 threads and 256 concurrent connections
+- Each scenario uses functionally equivalent handlers, routing patterns, and middleware across frameworks
+- Servers run with release/production settings where applicable
+- Results are indicative; performance varies with workload, configuration, and environment
+
+<!-- markdownlint-disable-next-line MD033 -->
+<img src="./public/images/all_benchmarks.png" alt="GoFlash Benchmarks" />
+
+For more details: <https://github.com/goflash/benchmarks>
 
 ---
 

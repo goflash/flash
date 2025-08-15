@@ -24,7 +24,6 @@ mem.profile
 trace.out
 
 # Build/output directories
-bin/
 build/
 dist/
 out/
