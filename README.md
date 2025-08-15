@@ -1,13 +1,19 @@
-# GoFlash
-
-<!-- markdownlint-disable-next-line MD033 -->
 <img src="./public/images/logo-wide.png" alt="GoFlash Logo" />
 
-A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.
+**A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.**
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/goflash/flash.svg)](https://pkg.go.dev/github.com/goflash/flash)
+<a href="https://goreportcard.com/report/github.com/goflash/flash">
+    <img src="https://img.shields.io/badge/%F0%9F%93%9D%20Go Report-A%2B-75C46B?style=flat-square">
+</a>
 [![Coverage](https://codecov.io/gh/goflash/flash/branch/main/graph/badge.svg)](https://codecov.io/gh/goflash/flash)
+<a href="https://github.com/goflash/flash/actions?query=workflow%3ATest">
+    <img src="https://img.shields.io/github/actions/workflow/status/goflash/flash/test-coverage.yml?branch=main&label=%F0%9F%A7%AA%20Tests&style=flat-square&color=75C46B">
+</a>
 ![Go Version](https://img.shields.io/badge/go-1.22%2B-00ADD8?logo=golang)
+<a href="https://docs.goflash.dev">
+    <img src="https://img.shields.io/badge/%F0%9F%92%A1%20GoFlash-docs-00ACD7.svg?style=flat-square">
+</a>
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -34,36 +40,35 @@ A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics yo
 
 ## Contents
 
-- [GoFlash](#goflash)
-  - [Overview](#overview)
-  - [Contents](#contents)
-  - [Features](#features)
-    - [Performance highlights](#performance-highlights)
-  - [Why `GoFlash` vs Gin/Fiber/Others](#why-goflash-vs-ginfiberothers)
-    - [Key differences and rationale](#key-differences-and-rationale)
-  - [Install](#install)
-  - [Quick Start](#quick-start)
-  - [Core Concepts](#core-concepts)
-    - [Routing](#routing)
-      - [Pattern reference](#pattern-reference)
-    - [Context (Ctx)](#context-ctx)
-    - [Mounting/Interop](#mountinginterop)
-      - [Mounting http.Handler or ServeMux](#mounting-httphandler-or-servemux)
-      - [Mounting a single http.Handler on a route](#mounting-a-single-httphandler-on-a-route)
-      - [Migration and Interop Patterns](#migration-and-interop-patterns)
-      - [Advanced: Composing with net/http](#advanced-composing-with-nethttp)
-    - [Logging](#logging)
-  - [Built-in Middleware](#built-in-middleware)
-    - [Usage](#usage)
-  - [Observability (OpenTelemetry)](#observability-opentelemetry)
-    - [Example](#example)
-  - [Validation](#validation)
-    - [Localized messages (i18n)](#localized-messages-i18n)
-  - [Sessions](#sessions)
-  - [Performance Notes](#performance-notes)
-  - [All Examples](#all-examples)
-  - [Benchmarks](#benchmarks)
-  - [Contributing](#contributing)
+- [Overview](#overview)
+- [Contents](#contents)
+- [Features](#features)
+  - [Performance highlights](#performance-highlights)
+- [Why `GoFlash` vs Gin/Fiber/Others](#why-goflash-vs-ginfiberothers)
+  - [Key differences and rationale](#key-differences-and-rationale)
+- [Install](#install)
+- [Quick Start](#quick-start)
+- [Core Concepts](#core-concepts)
+  - [Routing](#routing)
+    - [Pattern reference](#pattern-reference)
+  - [Context (Ctx)](#context-ctx)
+  - [Mounting/Interop](#mountinginterop)
+    - [Mounting http.Handler or ServeMux](#mounting-httphandler-or-servemux)
+    - [Mounting a single http.Handler on a route](#mounting-a-single-httphandler-on-a-route)
+    - [Migration and Interop Patterns](#migration-and-interop-patterns)
+    - [Advanced: Composing with net/http](#advanced-composing-with-nethttp)
+  - [Logging](#logging)
+- [Built-in Middleware](#built-in-middleware)
+  - [Usage](#usage)
+- [Observability (OpenTelemetry)](#observability-opentelemetry)
+  - [Example](#example)
+- [Validation](#validation)
+  - [Localized messages (i18n)](#localized-messages-i18n)
+- [Sessions](#sessions)
+- [Performance Notes](#performance-notes)
+- [All Examples](#all-examples)
+- [Benchmarks](#benchmarks)
+- [Contributing](#contributing)
 
 ---
 
@@ -514,3 +519,24 @@ For more details: <https://github.com/goflash/benchmarks>
 ## Contributing
 
 We welcome issues and PRs! Please read [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+---
+
+<div align="center">
+
+**⭐ Star this repo if you find it useful!**
+
+[![GitHub stars](https://img.shields.io/github/stars/goflash/flash?style=social)](https://github.com/goflash/flash/stargazers)
+
+---
+
+<small>
+
+**📝 License**: MIT | **🔄 Last Updated**: August 2025 | **📧 Support**: [Create an Issue]([../../issues](https://github.com/goflash/flash/issues))
+
+Battle tested in private productions.
+<br/> Released with ❤️ for the Go community.
+
+</small>
+
+</div>
