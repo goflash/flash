@@ -19,6 +19,36 @@
 
 ---
 
+## Quick Start
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/goflash/flash"
+    mw "github.com/goflash/flash/middleware"
+)
+
+func main() {
+    app := flash.New()
+
+    app.Use(mw.Recover(), mw.Logger(), mw.RequestID(), mw.Sessions(mw.SessionConfig{}))
+
+    app.GET("/hello/:name", func(c *flash.Ctx) error {
+        return c.JSON(map[string]any{"hello": c.Param("name")})
+    })
+
+    log.Fatal(http.ListenAndServe(":8080", app))
+}
+```
+
+> More examples 📁: Browse the runnable examples in [examples](./examples/).
+
+---
+
 ## Overview
 
 - 🎯 Purpose: Productive HTTP framework with a tiny, composable core and batteries-included middlewares.
@@ -35,40 +65,6 @@
 - 🧭 Scope: Minimal core by design; advanced patterns live in middleware and the examples catalog.
 
 > Note ✅: This README shows only minimal examples. For complete, runnable samples, see the examples directory: [examples](./examples/).
-
----
-
-## Contents
-
-- [Overview](#overview)
-- [Contents](#contents)
-- [Features](#features)
-  - [Performance highlights](#performance-highlights)
-- [Why `GoFlash` vs Gin/Fiber/Others](#why-goflash-vs-ginfiberothers)
-  - [Key differences and rationale](#key-differences-and-rationale)
-- [Install](#install)
-- [Quick Start](#quick-start)
-- [Core Concepts](#core-concepts)
-  - [Routing](#routing)
-    - [Pattern reference](#pattern-reference)
-  - [Context (Ctx)](#context-ctx)
-  - [Mounting/Interop](#mountinginterop)
-    - [Mounting http.Handler or ServeMux](#mounting-httphandler-or-servemux)
-    - [Mounting a single http.Handler on a route](#mounting-a-single-httphandler-on-a-route)
-    - [Migration and Interop Patterns](#migration-and-interop-patterns)
-    - [Advanced: Composing with net/http](#advanced-composing-with-nethttp)
-  - [Logging](#logging)
-- [Built-in Middleware](#built-in-middleware)
-  - [Usage](#usage)
-- [Observability (OpenTelemetry)](#observability-opentelemetry)
-  - [Example](#example)
-- [Validation](#validation)
-  - [Localized messages (i18n)](#localized-messages-i18n)
-- [Sessions](#sessions)
-- [Performance Notes](#performance-notes)
-- [All Examples](#all-examples)
-- [Benchmarks](#benchmarks)
-- [Contributing](#contributing)
 
 ---
 
@@ -151,36 +147,6 @@ go get github.com/goflash/flash
 ```
 
 If an example uses extra deps (e.g., [gorilla/websocket](https://github.com/gorilla/websocket), [OpenTelemetry](https://opentelemetry.io/)), run `go mod tidy` at repo root.
-
----
-
-## Quick Start
-
-```go
-package main
-
-import (
-    "log"
-    "net/http"
-
-    "github.com/goflash/flash"
-    mw "github.com/goflash/flash/middleware"
-)
-
-func main() {
-    app := flash.New()
-
-    app.Use(mw.Recover(), mw.Logger(), mw.RequestID(), mw.Sessions(mw.SessionConfig{}))
-
-    app.GET("/hello/:name", func(c *flash.Ctx) error {
-        return c.JSON(map[string]any{"hello": c.Param("name")})
-    })
-
-    log.Fatal(http.ListenAndServe(":8080", app))
-}
-```
-
-> More examples 📁: Browse the runnable examples in [examples](./examples/).
 
 ---
 
