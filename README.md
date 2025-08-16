@@ -6,7 +6,7 @@
 <a href="https://goreportcard.com/report/github.com/goflash/flash">
     <img src="https://img.shields.io/badge/%F0%9F%93%9D%20Go Report-A%2B-75C46B?style=flat-square">
 </a>
-[![Coverage](https://codecov.io/gh/goflash/flash/branch/main/graph/badge.svg)](https://codecov.io/gh/goflash/flash)
+[![Coverage](https://codecov.io/gh/goflash/flash/graph/badge.svg?token=VRHM48HJ5L)](https://codecov.io/gh/goflash/flash)
 <a href="https://github.com/goflash/flash/actions?query=workflow%3ATest">
     <img src="https://img.shields.io/github/actions/workflow/status/goflash/flash/test-coverage.yml?branch=main&label=%F0%9F%A7%AA%20Tests&style=flat-square&color=75C46B">
 </a>
