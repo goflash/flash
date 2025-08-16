@@ -35,7 +35,7 @@ import (
 func main() {
     app := flash.New()
 
-    app.Use(mw.Recover(), mw.Logger(), mw.RequestID(), mw.Sessions(mw.SessionConfig{}))
+    app.Use(mw.Recover(), mw.Logger())
 
     app.GET("/hello/:name", func(c *flash.Ctx) error {
         return c.JSON(map[string]any{"hello": c.Param("name")})
