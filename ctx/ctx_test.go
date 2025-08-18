@@ -691,3 +691,102 @@ func TestCtx_SetGet(t *testing.T) {
 		t.Fatalf("expected 'v', got %v", got)
 	}
 }
+
+func TestCtx_Clone_ShallowCopy(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/a/123?x=1", nil)
+	rec := httptest.NewRecorder()
+	ps := httprouter.Params{{Key: "id", Value: "123"}}
+	var c DefaultContext
+	c.Reset(rec, req, ps, "/a/:id")
+	c.Header("X-Test", "1")
+	c.Status(202)
+
+	clone := c.Clone()
+	// Assert basic properties copied
+	assert.Equal(t, "/a/123", clone.Path())
+	assert.Equal(t, "/a/:id", clone.Route())
+	assert.Equal(t, "123", clone.Param("id"))
+	assert.Equal(t, "1", clone.Query("x"))
+	// Mutate clone status and ensure original remains unchanged
+	_ = clone.Status(201)
+	// original still has 202 pending
+	assert.Equal(t, 202, c.StatusCode())
+}
+
+func TestJSONWithPresetStatus(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+	c.Status(http.StatusCreated)
+	err := c.JSON(map[string]any{"ok": true})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	// content-length should be set
+	if rec.Header().Get("Content-Length") == "" {
+		t.Fatalf("missing content-length")
+	}
+}
+
+func TestTypedHelpers_DefaultAndNoDefaultFallbacks(t *testing.T) {
+	// Prepare request with invalid query values
+	q := url.Values{}
+	q.Set("qi", "bad")
+	q.Set("qi64", "bad")
+	q.Set("qu", "-1") // invalid for uint
+	q.Set("qf", "bad")
+	q.Set("qb", "maybe")
+	u := &url.URL{Scheme: "http", Host: "example.com", Path: "/p/xx/yy/-1/x/maybe", RawQuery: q.Encode()}
+	req := &http.Request{Method: http.MethodGet, URL: u}
+	rec := httptest.NewRecorder()
+	ps := httprouter.Params{
+		{Key: "pi", Value: "xx"},    // invalid int
+		{Key: "pi64", Value: "yy"},  // invalid int64
+		{Key: "pu", Value: "-1"},    // invalid uint
+		{Key: "pf", Value: "x"},     // invalid float
+		{Key: "pb", Value: "maybe"}, // invalid bool
+	}
+	var c DefaultContext
+	c.Reset(rec, req, ps, "/p/:pi/:pi64/:pu/:pf/:pb")
+
+	// Path params with defaults
+	assert.Equal(t, 5, c.ParamInt("pi", 5))
+	assert.Equal(t, int64(6), c.ParamInt64("pi64", 6))
+	assert.Equal(t, uint(7), c.ParamUint("pu", 7))
+	assert.Equal(t, 1.25, c.ParamFloat64("pf", 1.25))
+	assert.Equal(t, true, c.ParamBool("pb", true))
+
+	// Path params without defaults -> zero values
+	assert.Equal(t, 0, c.ParamInt("pi"))
+	assert.Equal(t, int64(0), c.ParamInt64("pi64"))
+	assert.Equal(t, uint(0), c.ParamUint("pu"))
+	assert.Equal(t, 0.0, c.ParamFloat64("pf"))
+	assert.Equal(t, false, c.ParamBool("pb"))
+
+	// Missing keys -> fallback and zero
+	assert.Equal(t, 9, c.ParamInt("missing", 9))
+	assert.Equal(t, 0, c.ParamInt("missing"))
+	assert.Equal(t, uint(11), c.ParamUint("missingU", 11))
+	assert.Equal(t, uint(0), c.ParamUint("missingU"))
+	assert.Equal(t, 2.75, c.ParamFloat64("missingF", 2.75))
+	assert.Equal(t, 0.0, c.ParamFloat64("missingF"))
+	assert.Equal(t, true, c.ParamBool("missingB", true))
+	assert.Equal(t, false, c.ParamBool("missingB"))
+
+	// Query params invalid -> fallback and zero
+	assert.Equal(t, 3, c.QueryInt("qi", 3))
+	assert.Equal(t, 0, c.QueryInt("qi"))
+	assert.Equal(t, int64(4), c.QueryInt64("qi64", 4))
+	assert.Equal(t, int64(0), c.QueryInt64("qi64"))
+	assert.Equal(t, uint(5), c.QueryUint("qu", 5))
+	assert.Equal(t, uint(0), c.QueryUint("qu"))
+	assert.Equal(t, 6.5, c.QueryFloat64("qf", 6.5))
+	assert.Equal(t, 0.0, c.QueryFloat64("qf"))
+	assert.Equal(t, true, c.QueryBool("qb", true))
+	assert.Equal(t, false, c.QueryBool("qb"))
+
+	// Missing query keys -> fallback and zero
+	assert.Equal(t, 8, c.QueryInt("missingQi", 8))
+	assert.Equal(t, 0, c.QueryInt("missingQi"))
+	assert.Equal(t, uint(9), c.QueryUint("missingQu", 9))
+	assert.Equal(t, uint(0), c.QueryUint("missingQu"))
+}
