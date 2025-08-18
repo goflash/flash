@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v2"
 )
 
 // GzipConfig configures the gzip middleware.

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v2"
 )
 
 // BufferConfig configures the write-buffering middleware.

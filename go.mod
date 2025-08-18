@@ -1,4 +1,4 @@
-module github.com/goflash/flash/v1
+module github.com/goflash/flash/v2
 
 go 1.23.0
 

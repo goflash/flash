@@ -3,8 +3,8 @@ package middleware
 import (
 	"time"
 
-	"github.com/goflash/flash/v1"
-	"github.com/goflash/flash/v1/ctx"
+	"github.com/goflash/flash/v2"
+	"github.com/goflash/flash/v2/ctx"
 )
 
 // Logger returns middleware that logs each request using slog, including method, path, status, duration, remote address, and user agent.

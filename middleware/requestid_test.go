@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v2"
 )
 
 func TestRequestIDSetsHeaderAndContext(t *testing.T) {

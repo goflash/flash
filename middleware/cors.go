@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v2"
 )
 
 // CORSConfig holds configuration for the CORS middleware.

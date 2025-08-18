@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	validator "github.com/go-playground/validator/v10"
-	"github.com/goflash/flash/v1"
-	"github.com/goflash/flash/v1/validate"
+	"github.com/goflash/flash/v2"
+	"github.com/goflash/flash/v2/validate"
 )
 
 // ValidatorI18nConfig configures the ValidatorI18n middleware.

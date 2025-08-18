@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v2"
 )
 
 func TestBufferSetsContentLengthAndFlushes(t *testing.T) {

@@ -28,8 +28,8 @@ import (
     "log"
     "net/http"
 
-    "github.com/goflash/flash/v1"
-    mw "github.com/goflash/flash/v1/middleware"
+    "github.com/goflash/flash/v2"
+    mw "github.com/goflash/flash/v2/middleware"
 )
 
 func main() {
@@ -347,7 +347,7 @@ Use [go-playground/validator](https://github.com/go-playground/validator) via th
 ```go
 import (
     "net/http"
-    "github.com/goflash/flash/v1/validate"
+    "github.com/goflash/flash/v2/validate"
 )
 
 type Signup struct {
