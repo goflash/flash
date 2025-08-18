@@ -50,7 +50,7 @@ func CSRF(cfgs ...CSRFConfig) flash.Middleware {
 		cfg = cfgs[0]
 	}
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			// Only protect unsafe methods
 			if c.Method() == http.MethodGet || c.Method() == http.MethodHead || c.Method() == http.MethodOptions {
 				ensureCSRFCookie(c, cfg)
@@ -69,7 +69,7 @@ func CSRF(cfgs ...CSRFConfig) flash.Middleware {
 	}
 }
 
-func ensureCSRFCookie(c *flash.Ctx, cfg CSRFConfig) {
+func ensureCSRFCookie(c flash.Ctx, cfg CSRFConfig) {
 	cookie, err := c.Request().Cookie(cfg.CookieName)
 	if err == nil && cookie.Value != "" {
 		return

@@ -26,7 +26,7 @@ func newRequest(method, target string, body io.Reader) (*http.Request, *httptest
 
 func TestStringWritesStatusHeadersAndBody(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	assert.False(t, c.WroteHeader())
 	require.NoError(t, c.String(http.StatusCreated, "hello"))
@@ -39,7 +39,7 @@ func TestStringWritesStatusHeadersAndBody(t *testing.T) {
 
 func TestJSONWritesAndDefaultsAndEscape(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 
 	type payload struct {
@@ -55,7 +55,7 @@ func TestJSONWritesAndDefaultsAndEscape(t *testing.T) {
 
 func TestJSONEscapeDisabled(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	type payload struct {
 		Msg string `json:"msg"`
@@ -68,7 +68,7 @@ func TestJSONEscapeDisabled(t *testing.T) {
 
 func TestSendWritesBytesAndHeaders(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	n, err := c.Send(418, "application/octet-stream", []byte{1, 2, 3})
 	require.NoError(t, err)
@@ -80,7 +80,7 @@ func TestSendWritesBytesAndHeaders(t *testing.T) {
 
 func TestSendEmptyContentType(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	_, _ = c.Send(200, "", []byte("x"))
 	if rec.Header().Get("Content-Length") != "1" {
@@ -90,7 +90,7 @@ func TestSendEmptyContentType(t *testing.T) {
 
 func TestHeaderAndStatusCode(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	c.Header("X-Test", "1")
 	c.Status(http.StatusAccepted)
@@ -104,7 +104,7 @@ func TestParamQueryMethodPathRoute(t *testing.T) {
 	req := &http.Request{Method: http.MethodGet, URL: u}
 	rec := httptest.NewRecorder()
 	ps := httprouter.Params{httprouter.Param{Key: "id", Value: "123"}}
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, ps, "/users/:id")
 	assert.Equal(t, "GET", c.Method())
 	assert.Equal(t, "/users/123", c.Path())
@@ -113,20 +113,75 @@ func TestParamQueryMethodPathRoute(t *testing.T) {
 	assert.Equal(t, "go", c.Query("q"))
 }
 
+func TestTypedParamHelpers(t *testing.T) {
+	u := &url.URL{Scheme: "http", Host: "example.com", Path: "/u/42/3.14/true"}
+	req := &http.Request{Method: http.MethodGet, URL: u}
+	rec := httptest.NewRecorder()
+	ps := httprouter.Params{
+		{Key: "id", Value: "42"},
+		{Key: "pi", Value: "3.14"},
+		{Key: "ok", Value: "true"},
+	}
+	var c DefaultContext
+	c.Reset(rec, req, ps, "/u/:id/:pi/:ok")
+
+	assert.Equal(t, 42, c.ParamInt("id", -1))
+	assert.Equal(t, int64(42), c.ParamInt64("id", -2))
+	assert.Equal(t, uint(42), c.ParamUint("id", 9))
+	assert.InDelta(t, 3.14, c.ParamFloat64("pi", 0), 0.0001)
+	assert.Equal(t, true, c.ParamBool("ok", false))
+
+	// Missing or invalid -> default
+	assert.Equal(t, -1, c.ParamInt("missing", -1))
+	// No default provided -> zero value
+	assert.Equal(t, 0, c.ParamInt("missing"))
+	ps = append(ps, httprouter.Param{Key: "bad", Value: "xx"})
+	c.params = ps
+	assert.Equal(t, 7, c.ParamInt("bad", 7))
+}
+
+func TestTypedQueryHelpers(t *testing.T) {
+	q := url.Values{}
+	q.Set("n", "10")
+	q.Set("big", "9007199254740991") // < 2^53
+	q.Set("u", "11")
+	q.Set("f", "2.5")
+	q.Set("b", "true")
+	q.Set("bad", "nope")
+	u := &url.URL{Scheme: "http", Host: "example.com", Path: "/", RawQuery: q.Encode()}
+	req := &http.Request{Method: http.MethodGet, URL: u}
+	rec := httptest.NewRecorder()
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	assert.Equal(t, 10, c.QueryInt("n", -1))
+	assert.Equal(t, int64(9007199254740991), c.QueryInt64("big", -2))
+	assert.Equal(t, uint(11), c.QueryUint("u", 0))
+	assert.InDelta(t, 2.5, c.QueryFloat64("f", 0), 0.0001)
+	assert.Equal(t, true, c.QueryBool("b", false))
+
+	// Missing/invalid
+	assert.Equal(t, -9, c.QueryInt("missing", -9))
+	// No default provided -> zero value
+	assert.Equal(t, 0, c.QueryInt("missing"))
+	assert.Equal(t, 3, c.QueryInt("bad", 3))
+	assert.Equal(t, false, c.QueryBool("bad", false))
+}
+
 func TestBindJSONValidAndUnknownFields(t *testing.T) {
 	type In struct {
 		Name string `json:"name"`
 	}
 	// valid
 	req1, rec1 := newRequest(http.MethodPost, "/", bytes.NewBufferString("{\"name\":\"a\"}"))
-	var c1 Ctx
+	var c1 DefaultContext
 	c1.Reset(rec1, req1, nil, "/")
 	var in In
 	require.NoError(t, c1.BindJSON(&in))
 	assert.Equal(t, "a", in.Name)
 	// unknown field should error due to DisallowUnknownFields
 	req2, rec2 := newRequest(http.MethodPost, "/", bytes.NewBufferString("{\"name\":\"a\",\"x\":1}"))
-	var c2 Ctx
+	var c2 DefaultContext
 	c2.Reset(rec2, req2, nil, "/")
 	err := c2.BindJSON(&in)
 	require.Error(t, err)
@@ -135,7 +190,7 @@ func TestBindJSONValidAndUnknownFields(t *testing.T) {
 
 func TestJSONErrorSets500(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	type bad struct{ F func() }
 	err := c.JSON(bad{})
@@ -145,7 +200,7 @@ func TestJSONErrorSets500(t *testing.T) {
 
 func TestStatusCodeDefaultWhenHeaderNotWritten(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	c.Status(http.StatusAccepted)
 	// before write, StatusCode should be 202
@@ -154,7 +209,7 @@ func TestStatusCodeDefaultWhenHeaderNotWritten(t *testing.T) {
 
 func TestJSONSetsContentLengthAndTrimsNewline(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	type P struct {
 		A int `json:"a"`
@@ -171,7 +226,7 @@ func TestJSONSetsContentLengthAndTrimsNewline(t *testing.T) {
 func TestCtxAccessorsCoverage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/p?q=1", bytes.NewBufferString("{}"))
 	rec := httptest.NewRecorder()
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/p")
 	if c.Request() == nil || c.ResponseWriter() == nil || c.Context() == nil {
 		t.Fatalf("accessors nil")
@@ -191,7 +246,7 @@ func TestCtxAccessorsCoverage(t *testing.T) {
 func TestFinishAndAccessorsCoverage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", bytes.NewBufferString("{}"))
 	rec := httptest.NewRecorder()
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	_ = c.ResponseWriter()
 	_ = c.Request()
@@ -199,7 +254,7 @@ func TestFinishAndAccessorsCoverage(t *testing.T) {
 }
 
 func TestStatusCodeBranchesV2(t *testing.T) {
-	var c Ctx
+	var c DefaultContext
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	c.Reset(rec, req, nil, "/")
@@ -223,7 +278,7 @@ func TestBindJSON_TypeMismatchStrict_MapsToFieldError(t *testing.T) {
 	}
 	body := bytes.NewBufferString(`{"age":"x"}`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	err := c.BindJSON(&v)
@@ -239,7 +294,7 @@ func TestBindJSON_WeakTyping_AllowsStringToInt(t *testing.T) {
 	}
 	body := bytes.NewBufferString(`{"age":"10"}`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	err := c.BindJSON(&v, BindJSONOptions{WeaklyTypedInput: true})
@@ -253,7 +308,7 @@ func TestBindJSON_ErrorUnused_UnknownKeysMapped(t *testing.T) {
 	}
 	body := bytes.NewBufferString(`{"name":"n","x":1}`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	err := c.BindJSON(&v, BindJSONOptions{ErrorUnused: true})
@@ -322,7 +377,7 @@ func TestBindJSON_Strict_UnknownField_FieldErrors(t *testing.T) {
 	}
 	body := bytes.NewBufferString(`{"name":"a","x":1}`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var in In
 	err := c.BindJSON(&in)
@@ -389,7 +444,7 @@ func TestBindJSON_NonPointerTargetError(t *testing.T) {
 	// Passing a non-pointer should result in an InvalidUnmarshalError
 	body := bytes.NewBufferString("1")
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var i int
 	err := c.BindJSON(i) // not a pointer
@@ -406,7 +461,7 @@ func TestBindJSON_Flexible_ReadAllError(t *testing.T) {
 	// Force flexible path and make body.Read fail
 	req := httptest.NewRequest(http.MethodPost, "/", &errRC{})
 	rec := httptest.NewRecorder()
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	type T struct {
 		Name string `json:"name"`
@@ -420,7 +475,7 @@ func TestBindJSON_Flexible_ReadAllError(t *testing.T) {
 func TestBindJSON_NonStruct_StringSuccess(t *testing.T) {
 	body := bytes.NewBufferString(`"hello"`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var s string
 	require.NoError(t, c.BindJSON(&s))
@@ -430,7 +485,7 @@ func TestBindJSON_NonStruct_StringSuccess(t *testing.T) {
 func TestBindJSON_NonStruct_NilPointerTarget(t *testing.T) {
 	body := bytes.NewBufferString(`"hello"`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var s *string // nil pointer
 	err := c.BindJSON(s)
@@ -444,7 +499,7 @@ func TestBindJSON_Flexible_UnmarshalError_WeakTypingTrue(t *testing.T) {
 	}
 	body := bytes.NewBufferString(`[]`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	err := c.BindJSON(&v, BindJSONOptions{WeaklyTypedInput: true})
@@ -461,7 +516,7 @@ func TestBindJSON_Flexible_WeakTypingTrue_TypeMismatch_ReturnsRaw(t *testing.T) 
 	// array cannot coerce to int even with WeaklyTypedInput
 	body := bytes.NewBufferString(`{"age":[1]}`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	err := c.BindJSON(&v, BindJSONOptions{WeaklyTypedInput: true})
@@ -553,7 +608,7 @@ func TestBindJSON_Flexible_UnmarshalError_WeakTypingFalse_ReturnsRaw(t *testing.
 	}
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`[]`))
 	rec := httptest.NewRecorder()
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	// Enable flexible path with ErrorUnused, but keep WeaklyTypedInput false
@@ -568,7 +623,7 @@ func TestBindJSON_Flexible_WeakTypingFalse_TypeMismatch_MappedToFieldError(t *te
 	}
 	body := bytes.NewBufferString(`{"age":"42"}`)
 	req, rec := newRequest(http.MethodPost, "/", body)
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	var v T
 	err := c.BindJSON(&v, BindJSONOptions{WeaklyTypedInput: false})
@@ -581,7 +636,7 @@ func TestBindJSON_Flexible_WeakTypingFalse_TypeMismatch_MappedToFieldError(t *te
 
 func TestBindJSON_Flexible_JSONSyntaxError_ReturnsErr(t *testing.T) {
 	req, rec := newRequest(http.MethodPost, "/", bytes.NewBufferString("{"))
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	type T struct {
 		A int `json:"a"`
@@ -604,7 +659,7 @@ func TestBindJSON_Mapstructure_NewDecoderError(t *testing.T) {
 	defer func() { newMSDecoder = orig }()
 
 	req, rec := newRequest(http.MethodPost, "/", bytes.NewBufferString(`{"name":"x"}`))
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 	type T struct {
 		Name string `json:"name"`
@@ -619,7 +674,7 @@ func TestBindJSON_Mapstructure_NewDecoderError(t *testing.T) {
 func TestCtx_SetGet(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	var c Ctx
+	var c DefaultContext
 	c.Reset(rec, req, nil, "/")
 
 	// missing with no default -> nil

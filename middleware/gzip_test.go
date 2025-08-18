@@ -15,7 +15,7 @@ import (
 func TestGzipMiddlewareCompressesWhenAccepted(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, strings.Repeat("x", 100)) })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, strings.Repeat("x", 100)) })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -38,7 +38,7 @@ func TestGzipMiddlewareCompressesWhenAccepted(t *testing.T) {
 func TestGzipNotAppliedOnHEAD(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.HEAD("/x", func(c *flash.Ctx) error { return c.String(http.StatusOK, "") })
+	a.HEAD("/x", func(c flash.Ctx) error { return c.String(http.StatusOK, "") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodHead, "/x", nil)
 	a.ServeHTTP(rec, req)
@@ -50,7 +50,7 @@ func TestGzipNotAppliedOnHEAD(t *testing.T) {
 func TestGzipNotAppliedWhenEncodingPreset(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/x", func(c *flash.Ctx) error {
+	a.GET("/x", func(c flash.Ctx) error {
 		c.Header("Content-Encoding", "br")
 		return c.String(http.StatusOK, "ok")
 	})
@@ -66,8 +66,8 @@ func TestGzipNotAppliedWhenEncodingPreset(t *testing.T) {
 func TestGzipNotAppliedOnNoContentOrNotModified(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/n", func(c *flash.Ctx) error { c.ResponseWriter().WriteHeader(http.StatusNoContent); return nil })
-	a.GET("/m", func(c *flash.Ctx) error { c.ResponseWriter().WriteHeader(http.StatusNotModified); return nil })
+	a.GET("/n", func(c flash.Ctx) error { c.ResponseWriter().WriteHeader(http.StatusNoContent); return nil })
+	a.GET("/m", func(c flash.Ctx) error { c.ResponseWriter().WriteHeader(http.StatusNotModified); return nil })
 	for _, p := range []string{"/n", "/m"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, p, nil)
@@ -82,7 +82,7 @@ func TestGzipNotAppliedOnNoContentOrNotModified(t *testing.T) {
 func TestGzipFlushBranch(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/f", func(c *flash.Ctx) error {
+	a.GET("/f", func(c flash.Ctx) error {
 		// Write some data first so gzip writer is initialized
 		_, _ = c.ResponseWriter().Write([]byte("hello"))
 		if f, ok := c.ResponseWriter().(http.Flusher); ok {
@@ -102,7 +102,7 @@ func TestGzipFlushBranch(t *testing.T) {
 func TestGzipCloseWhenNoWriter(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/nowriter", func(c *flash.Ctx) error {
+	a.GET("/nowriter", func(c flash.Ctx) error {
 		// don't write anything, Close should no-op
 		return nil
 	})
@@ -132,7 +132,7 @@ func TestGzipCloseWithoutPutCallsClose(t *testing.T) {
 func TestGzipNotAppliedWithoutAcceptEncoding(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/plain", func(c *flash.Ctx) error { return c.String(http.StatusOK, "hello") })
+	a.GET("/plain", func(c flash.Ctx) error { return c.String(http.StatusOK, "hello") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/plain", nil)
 	// no Accept-Encoding header
@@ -148,7 +148,7 @@ func TestGzipNotAppliedWithoutAcceptEncoding(t *testing.T) {
 func TestGzipWithCustomLevelCompresses(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip(GzipConfig{Level: gzip.BestSpeed}))
-	a.GET("/lvl", func(c *flash.Ctx) error { return c.String(http.StatusOK, "xxxxxxxxxxxxxxxxxxxx") })
+	a.GET("/lvl", func(c flash.Ctx) error { return c.String(http.StatusOK, "xxxxxxxxxxxxxxxxxxxx") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/lvl", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -167,7 +167,7 @@ func TestGzipWithCustomLevelCompresses(t *testing.T) {
 func TestGzipAppliedWhenContentEncodingIdentity(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/id", func(c *flash.Ctx) error {
+	a.GET("/id", func(c flash.Ctx) error {
 		c.Header("Content-Encoding", "identity")
 		return c.String(http.StatusOK, "hello world")
 	})
@@ -189,7 +189,7 @@ func TestGzipAppliedWhenContentEncodingIdentity(t *testing.T) {
 func TestGzipWriteHeaderCalledTwiceUsesFirst(t *testing.T) {
 	a := flash.New()
 	a.Use(Gzip())
-	a.GET("/tw", func(c *flash.Ctx) error {
+	a.GET("/tw", func(c flash.Ctx) error {
 		w := c.ResponseWriter()
 		w.WriteHeader(http.StatusCreated)
 		w.WriteHeader(http.StatusAccepted) // should be ignored

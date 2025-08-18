@@ -8,7 +8,7 @@ import (
 
 // defaultErrorHandler is the default error handler for goflash applications.
 // It writes a 500 Internal Server Error if the response has not already started.
-func defaultErrorHandler(c *ctx.Ctx, err error) {
+func defaultErrorHandler(c ctx.Ctx, err error) {
 	// if response already started, do nothing
 	if c.WroteHeader() {
 		return

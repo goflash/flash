@@ -9,8 +9,8 @@ import (
 
 func TestDefaultErrorHandlerNoDoubleWrite(t *testing.T) {
 	a := New()
-	a.OnError = defaultErrorHandler
-	a.GET("/w", func(c *Ctx) error {
+	a.SetErrorHandler(defaultErrorHandler)
+	a.GET("/w", func(c Ctx) error {
 		_ = c.String(http.StatusTeapot, "x") // already wrote
 		return io.ErrUnexpectedEOF
 	})

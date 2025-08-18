@@ -13,9 +13,9 @@ func TestCORSPreflightAndHeaders(t *testing.T) {
 	a := flash.New()
 	a.Use(CORS(CORSConfig{Origins: []string{"*"}, Methods: []string{"GET", "POST"}, Headers: []string{"X-A"}, Expose: []string{"X-E"}, MaxAge: 600}))
 
-	a.GET("/x", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/x", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	// Register OPTIONS so middleware runs for preflight
-	a.OPTIONS("/x", func(c *flash.Ctx) error { return c.String(http.StatusNoContent, "") })
+	a.OPTIONS("/x", func(c flash.Ctx) error { return c.String(http.StatusNoContent, "") })
 
 	// Preflight
 	rec := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func TestCORSPreflightAndHeaders(t *testing.T) {
 func TestCORSDefaultMethodsPreflight(t *testing.T) {
 	a := flash.New()
 	a.Use(CORS(CORSConfig{Origins: []string{"*"}})) // Methods empty => default
-	a.OPTIONS("/x", func(c *flash.Ctx) error { return c.String(http.StatusNoContent, "") })
+	a.OPTIONS("/x", func(c flash.Ctx) error { return c.String(http.StatusNoContent, "") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/x", nil)
@@ -62,7 +62,7 @@ func TestCORSDefaultMethodsPreflight(t *testing.T) {
 func TestCORSUniqMethods(t *testing.T) {
 	a := flash.New()
 	a.Use(CORS(CORSConfig{Origins: []string{"*"}, Methods: []string{"GET", "GET", "POST"}}))
-	a.OPTIONS("/y", func(c *flash.Ctx) error { return c.String(http.StatusNoContent, "") })
+	a.OPTIONS("/y", func(c flash.Ctx) error { return c.String(http.StatusNoContent, "") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/y", nil)
@@ -77,7 +77,7 @@ func TestCORSUniqMethods(t *testing.T) {
 func TestCORSOptionsWithoutPreflightHeader(t *testing.T) {
 	a := flash.New()
 	a.Use(CORS(CORSConfig{Origins: []string{"*"}}))
-	a.OPTIONS("/noop", func(c *flash.Ctx) error { return c.String(http.StatusOK, "") })
+	a.OPTIONS("/noop", func(c flash.Ctx) error { return c.String(http.StatusOK, "") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/noop", nil)
 	a.ServeHTTP(rec, req)
@@ -89,7 +89,7 @@ func TestCORSOptionsWithoutPreflightHeader(t *testing.T) {
 func TestCORSCredentialsHeader(t *testing.T) {
 	a := flash.New()
 	a.Use(CORS(CORSConfig{Origins: []string{"*"}, Credentials: true}))
-	a.GET("/cred", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/cred", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/cred", nil)

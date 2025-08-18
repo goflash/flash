@@ -11,7 +11,7 @@ import (
 // The logger is taken from the request context or app, and can be enriched with a request ID if present.
 func Logger() flash.Middleware {
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			start := time.Now()
 			err := next(c)
 			dur := time.Since(start)

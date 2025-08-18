@@ -17,7 +17,7 @@ import (
 func TestOTelMiddlewareDoesNotBlock(t *testing.T) {
 	a := flash.New()
 	a.Use(OTel("test-svc"))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	a.ServeHTTP(rec, req)
@@ -29,7 +29,7 @@ func TestOTelMiddlewareDoesNotBlock(t *testing.T) {
 func TestOTelErrorBranch(t *testing.T) {
 	a := flash.New()
 	a.Use(OTel("svc"))
-	a.GET("/u/:id", func(c *flash.Ctx) error { return errors.New("boom") })
+	a.GET("/u/:id", func(c flash.Ctx) error { return errors.New("boom") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/u/1", nil)
 	a.ServeHTTP(rec, req)
@@ -43,7 +43,7 @@ func TestOTelWithConfig_Options(t *testing.T) {
 	a.Use(OTelWithConfig(OTelConfig{
 		ServiceName:    "svc",
 		RecordDuration: true,
-		Filter: func(c *flash.Ctx) bool {
+		Filter: func(c flash.Ctx) bool {
 			return c.Path() == "/healthz" // skip tracing but proceed
 		},
 		Status: func(code int, err error) (codes.Code, string) {
@@ -57,9 +57,9 @@ func TestOTelWithConfig_Options(t *testing.T) {
 		},
 	}))
 
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
-	a.GET("/healthz", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
-	a.GET("/bad", func(c *flash.Ctx) error { return c.String(http.StatusBadRequest, "bad") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/healthz", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/bad", func(c flash.Ctx) error { return c.String(http.StatusBadRequest, "bad") })
 
 	for path, want := range map[string]int{"/": http.StatusOK, "/healthz": http.StatusOK, "/bad": http.StatusBadRequest} {
 		rec := httptest.NewRecorder()
@@ -81,11 +81,11 @@ func TestOTelWithConfig_CustomizationsBranches(t *testing.T) {
 		Tracer:      noopTracer,
 		Propagator:  noopProp,
 		ServiceName: "svc2",
-		SpanName: func(c *flash.Ctx) string {
+		SpanName: func(c flash.Ctx) string {
 			// Return empty to ensure default branch fallback
 			return ""
 		},
-		Attributes: func(c *flash.Ctx) []attribute.KeyValue {
+		Attributes: func(c flash.Ctx) []attribute.KeyValue {
 			return []attribute.KeyValue{attribute.String("custom.attr", "v")}
 		},
 		ExtraAttributes: []attribute.KeyValue{attribute.String("extra.attr", "x")},
@@ -95,7 +95,7 @@ func TestOTelWithConfig_CustomizationsBranches(t *testing.T) {
 		},
 	}))
 
-	a.GET("/x", func(c *flash.Ctx) error {
+	a.GET("/x", func(c flash.Ctx) error {
 		// set route name to ensure http.route attribute path covered
 		return c.String(http.StatusOK, "ok")
 	})
@@ -112,12 +112,12 @@ func TestOTelWithConfig_SpanNameOverride_And_NoWrite(t *testing.T) {
 	a := flash.New()
 	a.Use(OTelWithConfig(OTelConfig{
 		ServiceName: "svc3",
-		SpanName:    func(c *flash.Ctx) string { return "CUSTOM NAME" }, // non-empty override branch
+		SpanName:    func(c flash.Ctx) string { return "CUSTOM NAME" }, // non-empty override branch
 		// default Status mapping used; ensure default branch is exercised
 	}))
 
 	// Handler writes nothing and returns nil -> status remains 0 inside middleware, should default to 200
-	a.GET("/empty", func(c *flash.Ctx) error { return nil })
+	a.GET("/empty", func(c flash.Ctx) error { return nil })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/empty", nil)

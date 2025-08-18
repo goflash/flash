@@ -5,14 +5,14 @@ import "net/http"
 // Group defines a group of routes with a common prefix and optional middleware.
 // Groups allow for modular organization of related routes and shared middleware.
 type Group struct {
-	app        *App         // parent app
+	app        *DefaultApp  // parent app
 	prefix     string       // route prefix
 	middleware []Middleware // group-level middleware
 }
 
 // Group creates a new route group with the given prefix and optional middleware.
 // Routes registered on the group will inherit the prefix and middleware.
-func (a *App) Group(prefix string, mw ...Middleware) *Group {
+func (a *DefaultApp) Group(prefix string, mw ...Middleware) *Group {
 	return &Group{app: a, prefix: cleanPath(prefix), middleware: mw}
 }
 

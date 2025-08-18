@@ -14,8 +14,8 @@ func TestCSRFProtection(t *testing.T) {
 	a.Use(CSRF())
 
 	// Handlers
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "get") })
-	a.POST("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "post") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "get") })
+	a.POST("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "post") })
 
 	// GET should set cookie
 	rec := httptest.NewRecorder()
@@ -49,7 +49,7 @@ func TestCSRFProtection(t *testing.T) {
 func TestCSRFSafeMethodsSetCookieOnly(t *testing.T) {
 	a := flash.New()
 	a.Use(CSRF())
-	a.HEAD("/h", func(c *flash.Ctx) error { return c.String(http.StatusOK, "") })
+	a.HEAD("/h", func(c flash.Ctx) error { return c.String(http.StatusOK, "") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodHead, "/h", nil)
 	a.ServeHTTP(rec, req)
@@ -63,8 +63,8 @@ func TestCSRFInvalidHeader(t *testing.T) {
 	a.Use(CSRF())
 	// Register both GET and POST for same path to ensure middleware runs on GET to set cookie
 	path := "/p"
-	a.GET(path, func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
-	a.POST(path, func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET(path, func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.POST(path, func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	// obtain cookie via GET
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -91,7 +91,7 @@ func TestCSRFEnsureCookieNotOverwriteExisting(t *testing.T) {
 	// First request sets cookie
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	a.ServeHTTP(rec, req)
 	cks := rec.Result().Cookies()
 	if len(cks) == 0 {
@@ -112,7 +112,7 @@ func TestCSRFEnsureCookieNotOverwriteExisting(t *testing.T) {
 func TestCSRFPostNoCookieForbidden(t *testing.T) {
 	a := flash.New()
 	a.Use(CSRF())
-	a.POST("/x", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.POST("/x", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/x", nil)
 	a.ServeHTTP(rec, req)
@@ -125,7 +125,7 @@ func TestCSRFOptionsSetsCookie(t *testing.T) {
 	a := flash.New()
 	a.Use(CSRF())
 	// Register an OPTIONS handler so next() runs
-	a.OPTIONS("/opt", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.OPTIONS("/opt", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/opt", nil)
@@ -141,7 +141,7 @@ func TestCSRFOptionsSetsCookie(t *testing.T) {
 func TestCSRFPostWithEmptyCookieForbidden(t *testing.T) {
 	a := flash.New()
 	a.Use(CSRF())
-	a.POST("/p2", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.POST("/p2", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/p2", nil)
@@ -156,12 +156,12 @@ func TestCSRFPostWithEmptyCookieForbidden(t *testing.T) {
 func TestCSRFPostHeaderWrongLengthForbidden(t *testing.T) {
 	a := flash.New()
 	a.Use(CSRF())
-	a.POST("/z", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.POST("/z", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	// Obtain a valid cookie via GET
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/z", nil)
 	// Need a GET handler to call next()
-	a.GET("/z", func(c *flash.Ctx) error { return c.String(http.StatusOK, "g") })
+	a.GET("/z", func(c flash.Ctx) error { return c.String(http.StatusOK, "g") })
 	a.ServeHTTP(rec, req)
 	cks := rec.Result().Cookies()
 	if len(cks) == 0 {
@@ -195,8 +195,8 @@ func TestCSRFCustomConfig(t *testing.T) {
 	a.Use(CSRF(cfg))
 
 	path := "/c"
-	a.GET(path, func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
-	a.POST(path, func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET(path, func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.POST(path, func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	// GET sets custom cookie
 	rec := httptest.NewRecorder()

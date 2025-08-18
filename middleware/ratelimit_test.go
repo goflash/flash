@@ -13,7 +13,7 @@ func TestRateLimitBlocksAfterCapacity(t *testing.T) {
 	a := flash.New()
 	lim := NewSimpleIPLimiter(1, 100*time.Millisecond)
 	a.Use(RateLimit(lim))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -33,7 +33,7 @@ func TestRateLimitSetsRetryAfter(t *testing.T) {
 	a := flash.New()
 	lim := NewSimpleIPLimiter(1, 200*time.Millisecond)
 	a.Use(RateLimit(lim))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -55,7 +55,7 @@ func TestRateLimitResetAllowsAfterRetry(t *testing.T) {
 	a := flash.New()
 	lim := NewSimpleIPLimiter(1, 20*time.Millisecond)
 	a.Use(RateLimit(lim))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestRateLimitRemainingDecrementBranch(t *testing.T) {
 	a := flash.New()
 	lim := NewSimpleIPLimiter(2, 1*time.Second)
 	a.Use(RateLimit(lim))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestClientIPExtraction(t *testing.T) {
 		a := flash.New()
 		cap := &captureLimiter{}
 		a.Use(RateLimit(cap))
-		a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+		a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set("X-Forwarded-For", " 1.2.3.4, 5.6.7.8 ")
 		rec := httptest.NewRecorder()
@@ -119,7 +119,7 @@ func TestClientIPExtraction(t *testing.T) {
 		a := flash.New()
 		cap := &captureLimiter{}
 		a.Use(RateLimit(cap))
-		a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+		a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set("X-Real-IP", "9.8.7.6")
 		rec := httptest.NewRecorder()
@@ -133,7 +133,7 @@ func TestClientIPExtraction(t *testing.T) {
 		a := flash.New()
 		cap := &captureLimiter{}
 		a.Use(RateLimit(cap))
-		a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+		a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = "127.0.0.1:9898"
 		rec := httptest.NewRecorder()
@@ -147,7 +147,7 @@ func TestClientIPExtraction(t *testing.T) {
 		a := flash.New()
 		cap := &captureLimiter{}
 		a.Use(RateLimit(cap))
-		a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+		a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = "badremote"
 		rec := httptest.NewRecorder()

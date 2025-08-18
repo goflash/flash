@@ -8,9 +8,9 @@ import (
 
 func TestGroupAndNestedMiddleware(t *testing.T) {
 	a := New()
-	g := a.Group("/api", func(next Handler) Handler { return func(c *Ctx) error { c.Header("X-API", "1"); return next(c) } })
-	v1 := g.Group("/v1", func(next Handler) Handler { return func(c *Ctx) error { c.Header("X-V", "1"); return next(c) } })
-	v1.GET("/ping", func(c *Ctx) error { return c.String(http.StatusOK, "pong") })
+	g := a.Group("/api", func(next Handler) Handler { return func(c Ctx) error { c.Header("X-API", "1"); return next(c) } })
+	v1 := g.Group("/v1", func(next Handler) Handler { return func(c Ctx) error { c.Header("X-V", "1"); return next(c) } })
+	v1.GET("/ping", func(c Ctx) error { return c.String(http.StatusOK, "pong") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/ping", nil)
@@ -26,8 +26,8 @@ func TestGroupAndNestedMiddleware(t *testing.T) {
 func TestGroupUseAddsMiddleware(t *testing.T) {
 	a := New()
 	g := a.Group("/api")
-	g.Use(func(next Handler) Handler { return func(c *Ctx) error { c.Header("X-GU", "1"); return next(c) } })
-	g.GET("/x", func(c *Ctx) error { return c.String(http.StatusOK, "ok") })
+	g.Use(func(next Handler) Handler { return func(c Ctx) error { c.Header("X-GU", "1"); return next(c) } })
+	g.GET("/x", func(c Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/x", nil)
@@ -40,12 +40,12 @@ func TestGroupUseAddsMiddleware(t *testing.T) {
 func TestGroupMethodHelpersCoverage(t *testing.T) {
 	a := New()
 	g := a.Group("/g")
-	g.POST("/post", func(c *Ctx) error { return c.String(http.StatusOK, "POST") })
-	g.PUT("/put", func(c *Ctx) error { return c.String(http.StatusOK, "PUT") })
-	g.PATCH("/patch", func(c *Ctx) error { return c.String(http.StatusOK, "PATCH") })
-	g.DELETE("/delete", func(c *Ctx) error { return c.String(http.StatusOK, "DELETE") })
-	g.OPTIONS("/options", func(c *Ctx) error { return c.String(http.StatusOK, "OPTIONS") })
-	g.HEAD("/head", func(c *Ctx) error { return c.String(http.StatusOK, "") })
+	g.POST("/post", func(c Ctx) error { return c.String(http.StatusOK, "POST") })
+	g.PUT("/put", func(c Ctx) error { return c.String(http.StatusOK, "PUT") })
+	g.PATCH("/patch", func(c Ctx) error { return c.String(http.StatusOK, "PATCH") })
+	g.DELETE("/delete", func(c Ctx) error { return c.String(http.StatusOK, "DELETE") })
+	g.OPTIONS("/options", func(c Ctx) error { return c.String(http.StatusOK, "OPTIONS") })
+	g.HEAD("/head", func(c Ctx) error { return c.String(http.StatusOK, "") })
 
 	tests := []struct{ method, path, want string }{
 		{http.MethodPost, "/g/post", "POST"},

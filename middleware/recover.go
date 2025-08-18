@@ -10,7 +10,7 @@ import (
 // This prevents panics from crashing the server and provides a generic error response.
 func Recover() flash.Middleware {
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) (err error) {
+		return func(c flash.Ctx) (err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					_ = c.String(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))

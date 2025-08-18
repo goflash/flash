@@ -21,11 +21,11 @@ type OTelConfig struct {
 	// Propagator to extract context. If nil, otel.GetTextMapPropagator() is used.
 	Propagator propagation.TextMapPropagator
 	// Filter returns true to skip tracing for a request (e.g., health checks).
-	Filter func(*flash.Ctx) bool
+	Filter func(flash.Ctx) bool
 	// SpanName formats the span name. If nil, defaults to "METHOD ROUTE" or "METHOD PATH".
-	SpanName func(*flash.Ctx) string
+	SpanName func(flash.Ctx) string
 	// Attributes returns additional attributes to set on the span at the end of the request.
-	Attributes func(*flash.Ctx) []attribute.KeyValue
+	Attributes func(flash.Ctx) []attribute.KeyValue
 	// Status maps HTTP status and error to span status code/description. If nil, defaults to
 	// Error for err!=nil or status>=500, else Ok.
 	Status func(status int, err error) (codes.Code, string)
@@ -56,7 +56,7 @@ func OTelWithConfig(cfg OTelConfig) flash.Middleware {
 		prop = otel.GetTextMapPropagator()
 	}
 
-	defaultSpanName := func(c *flash.Ctx) string {
+	defaultSpanName := func(c flash.Ctx) string {
 		name := c.Method() + " " + c.Path()
 		if rt := c.Route(); rt != "" {
 			name = c.Method() + " " + rt
@@ -72,7 +72,7 @@ func OTelWithConfig(cfg OTelConfig) flash.Middleware {
 	}
 
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			// Optionally skip tracing
 			if cfg.Filter != nil && cfg.Filter(c) {
 				return next(c)

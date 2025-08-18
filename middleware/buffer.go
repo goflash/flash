@@ -28,7 +28,7 @@ func Buffer(cfgs ...BufferConfig) flash.Middleware {
 		cfg = cfgs[0]
 	}
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			brw := &bufferedRW{rw: c.ResponseWriter(), cfg: cfg}
 			c.SetResponseWriter(brw)
 			defer brw.Close()

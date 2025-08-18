@@ -13,9 +13,9 @@ import (
 // TimeoutConfig configures the timeout middleware.
 // Duration sets the timeout. OnTimeout is called when a timeout occurs. ErrorResponse can customize the timeout response.
 type TimeoutConfig struct {
-	Duration      time.Duration          // request timeout duration
-	OnTimeout     func(*flash.Ctx)       // optional callback on timeout
-	ErrorResponse func(*flash.Ctx) error // optional custom error response
+	Duration      time.Duration         // request timeout duration
+	OnTimeout     func(flash.Ctx)       // optional callback on timeout
+	ErrorResponse func(flash.Ctx) error // optional custom error response
 }
 
 // timeoutWriter buffers header mutations locally and writes to the real writer under a mutex.
@@ -149,7 +149,7 @@ func Timeout(cfg TimeoutConfig) flash.Middleware {
 		cfg.Duration = 5 * time.Second
 	}
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			ctx, cancel := context.WithTimeout(c.Context(), cfg.Duration)
 			defer cancel()
 
@@ -157,13 +157,13 @@ func Timeout(cfg TimeoutConfig) flash.Middleware {
 			c.SetRequest(c.Request().WithContext(ctx))
 
 			// Prepare a shallow copy of the context for the handler goroutine to avoid races
-			copyCtx := *c
+			copyCtx := c.Clone()
 			tw := newTimeoutWriter(c.ResponseWriter())
 			copyCtx.SetResponseWriter(tw)
 			copyCtx.SetRequest(c.Request())
 
 			done := make(chan error, 1)
-			go func() { done <- next(&copyCtx) }()
+			go func() { done <- next(copyCtx) }()
 
 			select {
 			case err := <-done:

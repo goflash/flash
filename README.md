@@ -37,7 +37,7 @@ func main() {
 
     app.Use(mw.Recover(), mw.Logger())
 
-    app.GET("/hello/:name", func(c *flash.Ctx) error {
+    app.GET("/hello/:name", func(c flash.Ctx) error {
         return c.JSON(map[string]any{"hello": c.Param("name")})
     })
 
@@ -74,7 +74,7 @@ func main() {
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.               |
 | **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.         |
-| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, `BindJSON`, `JSON`, `String`, `Header`, etc.               |
+| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, typed `ParamInt/Bool/...`, `BindJSON`, `JSON`, `String`.   |
 | **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                   |
 | **Built-in middleware**    | Logger, Recover, CORS, Timeout, OpenTelemetry, Sessions, Gzip, Request ID, Rate Limit, Buffer.                   |
 | **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                   |
@@ -171,33 +171,50 @@ Routing patterns and behavior follow julienschmidt/httprouter. See:
 
 flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request, designed for both ergonomics and performance. All helpers are explicit, chainable where appropriate, and safe for high-concurrency use.
 
-| Method                       | Purpose / Rationale                                                                                |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Request()`                  | Returns the underlying *http.Request for advanced/interop use.                                     |
-| `SetRequest(r)`              | Replace the request (e.g., to propagate context or swap in a new request).                         |
-| `ResponseWriter()`           | Returns the underlying http.ResponseWriter for low-level control.                                  |
-| `SetResponseWriter(w)`       | Replace the underlying http.ResponseWriter (e.g., for gzip or buffer middleware).                  |
-| `WroteHeader()`              | Reports whether the response header has been written.                                              |
-| `Context()`                  | Returns the request context for cancellation, deadlines, tracing, etc.                             |
-| `Set(key, value)`            | Store a value on the request context (clones request with context.WithValue).                      |
-| `Get(key [,def])`            | Retrieve a value from the request context; returns def if provided and missing, else nil.          |
-| `Method()`                   | Returns the HTTP method (GET, POST, etc).                                                          |
-| `Path()`                     | Returns the request URL path.                                                                      |
-| `Route()`                    | Returns the matched route pattern (e.g., `/users/:id`).                                            |
-| `Param(name)`                | Returns a path parameter by name.                                                                  |
-| `Query(key)`                 | Returns a query string parameter by key.                                                           |
-| `Status(code)`               | Sets the response status code (chainable, does not write header yet).                              |
-| `StatusCode()`               | Returns the status code that will be written (or 200 if not set yet).                              |
-| `Header(key, value)`         | Sets a response header.                                                                            |
-| `SetJSONEscapeHTML(bool)`    | Controls whether JSON responses escape HTML (default true, for XSS safety).                        |
-| `JSON(v)`                    | Writes a value as JSON, sets Content-Type/Length, and status (uses pooled buffer for performance). |
-| `String(status, body)`       | Writes a plain text response with status and body.                                                 |
-| `Send(status, type, []byte)` | Writes raw bytes with status and content type.                                                     |
-| `BindJSON(&v)`               | Strictly decodes request body JSON into v (unknown fields rejected, closes body).                  |
-| `Finish()`                   | Finalizes the context (reserved for future buffer reuse, currently a no-op).                       |
-| `Reset(w, r, ps, route)`     | Internal: resets the context for pooling (not for user code).                                      |
+| Method                                        | Purpose / Rationale                                                                                |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Request()`                                   | Returns the underlying *http.Request for advanced/interop use.                                     |
+| `SetRequest(r)`                               | Replace the request (e.g., to propagate context or swap in a new request).                         |
+| `ResponseWriter()`                            | Returns the underlying http.ResponseWriter for low-level control.                                  |
+| `SetResponseWriter(w)`                        | Replace the underlying http.ResponseWriter (e.g., for gzip or buffer middleware).                  |
+| `WroteHeader()`                               | Reports whether the response header has been written.                                              |
+| `Context()`                                   | Returns the request context for cancellation, deadlines, tracing, etc.                             |
+| `Set(key, value)`                             | Store a value on the request context (clones request with context.WithValue).                      |
+| `Get(key [,def])`                             | Retrieve a value from the request context; returns def if provided and missing, else nil.          |
+| `Method()`                                    | Returns the HTTP method (GET, POST, etc).                                                          |
+| `Path()`                                      | Returns the request URL path.                                                                      |
+| `Route()`                                     | Returns the matched route pattern (e.g., `/users/:id`).                                            |
+| `Param(name)`                                 | Returns a path parameter by name.                                                                  |
+| `Query(key)`                                  | Returns a query string parameter by key.                                                           |
+| `ParamInt/Int64/Uint/Float64/Bool(name, def)` | Typed path params with sensible defaults when missing/invalid.                                     |
+| `QueryInt/Int64/Uint/Float64/Bool(key, def)`  | Typed query params with sensible defaults when missing/invalid.                                    |
+| `Status(code)`                                | Sets the response status code (chainable, does not write header yet).                              |
+| `StatusCode()`                                | Returns the status code that will be written (or 200 if not set yet).                              |
+| `Header(key, value)`                          | Sets a response header.                                                                            |
+| `SetJSONEscapeHTML(bool)`                     | Controls whether JSON responses escape HTML (default true, for XSS safety).                        |
+| `JSON(v)`                                     | Writes a value as JSON, sets Content-Type/Length, and status (uses pooled buffer for performance). |
+| `String(status, body)`                        | Writes a plain text response with status and body.                                                 |
+| `Send(status, type, []byte)`                  | Writes raw bytes with status and content type.                                                     |
+| `BindJSON(&v)`                                | Strictly decodes request body JSON into v (unknown fields rejected, closes body).                  |
+| `Finish()`                                    | Finalizes the context (reserved for future buffer reuse, currently a no-op).                       |
+| `Reset(w, r, ps, route)`                      | Internal: resets the context for pooling (not for user code).                                      |
 
 > All methods are designed for explicitness, safety, and performance. You always have access to the underlying http types for advanced use, but the ergonomic helpers cover 99% of use cases.
+
+#### Typed query and path parameters
+
+Avoid repetitive `strconv` calls with typed helpers that return a parsed value or a default:
+
+```go
+app.GET("/users/:id", func(c flash.Ctx) error {
+    id := c.ParamInt("id", 0)        // 0 if missing/invalid
+    active := c.QueryBool("active", false)
+    limit := c.QueryInt("limit", 20) // default to 20
+    return c.JSON(map[string]any{"id": id, "active": active, "limit": limit})
+})
+```
+
+> See a runnable example in examples/query_params.
 
 ### Mounting/Interop
 
@@ -355,7 +372,7 @@ type Signup struct {
     Age   int    `json:"age" validate:"required,min=13"`
 }
 
-app.POST("/signup", func(c *flash.Ctx) error {
+app.POST("/signup", func(c flash.Ctx) error {
     var in Signup
     if err := c.BindJSON(&in); err != nil {
         return c.Status(http.StatusBadRequest).JSON(map[string]any{"error": "invalid json"})
@@ -388,7 +405,7 @@ app.Use(middleware.ValidatorI18n(middleware.ValidatorI18nConfig{
 }))
 
 // With routes like /:lang/..., locale is taken from :lang by default
-app.POST(":lang/signup", func(c *flash.Ctx) error {
+app.POST(":lang/signup", func(c flash.Ctx) error {
     var in Signup
     if err := c.BindJSON(&in); err != nil {
         return c.Status(400).JSON(map[string]any{"fields": validate.ToFieldErrors(err)})
@@ -414,7 +431,7 @@ app.POST(":lang/signup", func(c *flash.Ctx) error {
 
 ```go
 app.Use(mw.Sessions(mw.SessionConfig{ TTL: 24*time.Hour }))
-app.GET("/me", func(c *flash.Ctx) error {
+app.GET("/me", func(c flash.Ctx) error {
     s := mw.SessionFromCtx(c)
     s.Set("user", "u1")
     return c.JSON(map[string]any{"user": "u1"})

@@ -140,7 +140,7 @@ func Sessions(cfg SessionConfig) flash.Middleware {
 	}
 
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			r := c.Request()
 			id := readSessionID(r, cfg)
 
@@ -189,7 +189,7 @@ func Sessions(cfg SessionConfig) flash.Middleware {
 }
 
 // SessionFromCtx retrieves the Session previously loaded by Sessions middleware.
-func SessionFromCtx(c *flash.Ctx) *Session {
+func SessionFromCtx(c flash.Ctx) *Session {
 	v := c.Context().Value(sessionContextKey{})
 	if v == nil {
 		return &Session{Values: map[string]any{}}
@@ -214,7 +214,7 @@ func readSessionID(r *http.Request, cfg SessionConfig) string {
 	return ""
 }
 
-func writeSessionID(c *flash.Ctx, id string, cfg SessionConfig) {
+func writeSessionID(c flash.Ctx, id string, cfg SessionConfig) {
 	if cfg.HeaderName != "" {
 		c.Header(cfg.HeaderName, id)
 	}

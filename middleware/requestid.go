@@ -24,7 +24,7 @@ func RequestID(cfgs ...RequestIDConfig) flash.Middleware {
 		cfg.Header = cfgs[0].Header
 	}
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			id := c.Request().Header.Get(cfg.Header)
 			if id == "" {
 				id = newID()

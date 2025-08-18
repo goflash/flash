@@ -52,7 +52,7 @@ func Gzip(cfgs ...GzipConfig) flash.Middleware {
 		}
 	}
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			r := c.Request()
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || c.Method() == http.MethodHead {
 				return next(c)

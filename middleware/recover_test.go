@@ -11,7 +11,7 @@ import (
 func TestRecoverMiddleware(t *testing.T) {
 	a := flash.New()
 	a.Use(Recover())
-	a.GET("/panic", func(c *flash.Ctx) error { panic("boom") })
+	a.GET("/panic", func(c flash.Ctx) error { panic("boom") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
 	a.ServeHTTP(rec, req)

@@ -16,13 +16,13 @@ func TestSessionsCookieAndHeader(t *testing.T) {
 	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, CookieName: "sid", HeaderName: "X-Session-ID"}))
 
 	// set route writes a session value, causing save and cookie/header set
-	a.GET("/set", func(c *flash.Ctx) error {
+	a.GET("/set", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		s.Set("k", "v")
 		return c.String(http.StatusOK, "ok")
 	})
 	// get route reads session
-	a.GET("/get", func(c *flash.Ctx) error {
+	a.GET("/get", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		if v, ok := s.Get("k"); ok {
 			return c.String(http.StatusOK, v.(string))
@@ -105,14 +105,14 @@ func TestSessionDeleteBranches(t *testing.T) {
 	store := NewMemoryStore()
 	a := flash.New()
 	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, CookieName: "sid"}))
-	a.GET("/set", func(c *flash.Ctx) error {
+	a.GET("/set", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		s.Set("k", "v")
 		return c.String(http.StatusOK, "ok")
 	})
-	a.GET("/del", func(c *flash.Ctx) error { s := SessionFromCtx(c); s.Delete("k"); return c.String(http.StatusOK, "ok") })
+	a.GET("/del", func(c flash.Ctx) error { s := SessionFromCtx(c); s.Delete("k"); return c.String(http.StatusOK, "ok") })
 	// read returns missing after delete
-	a.GET("/get", func(c *flash.Ctx) error {
+	a.GET("/get", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		if _, ok := s.Get("k"); ok {
 			return c.String(http.StatusOK, "has")
@@ -149,13 +149,13 @@ func TestSessionsHeaderBasedID(t *testing.T) {
 	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, HeaderName: "X-SID"}))
 
 	// set
-	a.GET("/set", func(c *flash.Ctx) error {
+	a.GET("/set", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		s.Set("k", "v")
 		return c.String(http.StatusOK, "ok")
 	})
 	// get
-	a.GET("/get", func(c *flash.Ctx) error {
+	a.GET("/get", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		if v, ok := s.Get("k"); ok {
 			return c.String(http.StatusOK, v.(string))
@@ -186,7 +186,7 @@ func TestSessionsExternalIDNoChangesFlushAtEnd(t *testing.T) {
 	// Provide only Store and HeaderName to exercise defaults and the (new && ID != "") branch
 	a.Use(Sessions(SessionConfig{Store: store, HeaderName: "X-SID"}))
 	// Handler does not write headers/body and does not change session
-	a.GET("/noop", func(c *flash.Ctx) error { return nil })
+	a.GET("/noop", func(c flash.Ctx) error { return nil })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/noop", nil)
@@ -215,7 +215,7 @@ func TestSessionsNoIDNoChangesNoSetCookie(t *testing.T) {
 	a := flash.New()
 	// Default config (no HeaderName). No incoming cookie/id and handler makes no changes
 	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour}))
-	a.GET("/noop2", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/noop2", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/noop2", nil)
@@ -233,7 +233,7 @@ func TestSessionHeaderWriteInterceptorWriteCallsBefore(t *testing.T) {
 	a := flash.New()
 	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, CookieName: "sid"}))
 	// Write to ResponseWriter directly without calling c.String to trigger headerWriteInterceptor.Write
-	a.GET("/w", func(c *flash.Ctx) error {
+	a.GET("/w", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		s.Set("k", "v")
 		_, _ = c.ResponseWriter().Write([]byte("ok"))
@@ -253,7 +253,7 @@ func TestSessionHeaderWriteInterceptorWriteCallsBefore(t *testing.T) {
 func TestSessionFromCtxNil(t *testing.T) {
 	// Without Sessions middleware, SessionFromCtx should return empty session
 	a := flash.New()
-	a.GET("/x", func(c *flash.Ctx) error {
+	a.GET("/x", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		if _, ok := s.Get("k"); ok {
 			t.Fatalf("expected empty session values")
@@ -272,7 +272,7 @@ func TestHeaderWriteInterceptorWriteHeaderPath(t *testing.T) {
 	store := NewMemoryStore()
 	a := flash.New()
 	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, CookieName: "sid"}))
-	a.GET("/h", func(c *flash.Ctx) error {
+	a.GET("/h", func(c flash.Ctx) error {
 		s := SessionFromCtx(c)
 		s.Set("x", "y")
 		// trigger WriteHeader path (without body)
@@ -292,7 +292,7 @@ func TestHeaderWriteInterceptorWriteHeaderPath(t *testing.T) {
 
 func TestSessionFromCtxWrongTypeValue(t *testing.T) {
 	a := flash.New()
-	a.GET("/wt", func(c *flash.Ctx) error {
+	a.GET("/wt", func(c flash.Ctx) error {
 		// Inject a wrong-typed value under sessionContextKey{}
 		r := c.Request().WithContext(context.WithValue(c.Context(), sessionContextKey{}, "bad"))
 		c.SetRequest(r)

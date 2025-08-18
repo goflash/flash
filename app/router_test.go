@@ -8,12 +8,12 @@ import (
 
 func TestAppMethodHelpersV2(t *testing.T) {
 	a := New()
-	a.POST("/p", func(c *Ctx) error { return c.String(http.StatusOK, "P") })
-	a.PUT("/u", func(c *Ctx) error { return c.String(http.StatusOK, "U") })
-	a.PATCH("/pa", func(c *Ctx) error { return c.String(http.StatusOK, "PA") })
-	a.DELETE("/d", func(c *Ctx) error { return c.String(http.StatusOK, "D") })
-	a.OPTIONS("/o", func(c *Ctx) error { return c.String(http.StatusOK, "O") })
-	a.HEAD("/h", func(c *Ctx) error { return c.String(http.StatusOK, "") })
+	a.POST("/p", func(c Ctx) error { return c.String(http.StatusOK, "P") })
+	a.PUT("/u", func(c Ctx) error { return c.String(http.StatusOK, "U") })
+	a.PATCH("/pa", func(c Ctx) error { return c.String(http.StatusOK, "PA") })
+	a.DELETE("/d", func(c Ctx) error { return c.String(http.StatusOK, "D") })
+	a.OPTIONS("/o", func(c Ctx) error { return c.String(http.StatusOK, "O") })
+	a.HEAD("/h", func(c Ctx) error { return c.String(http.StatusOK, "") })
 
 	tests := []struct{ m, p, want string }{
 		{http.MethodPost, "/p", "P"},
@@ -36,13 +36,13 @@ func TestAppMethodHelpersV2(t *testing.T) {
 func TestRouterAllMethodsHelpersV2(t *testing.T) {
 	a := New()
 	g := a.Group("/r")
-	g.GET("/get", func(c *Ctx) error { return c.String(http.StatusOK, "GET") })
-	g.POST("/post", func(c *Ctx) error { return c.String(http.StatusOK, "POST") })
-	g.PUT("/put", func(c *Ctx) error { return c.String(http.StatusOK, "PUT") })
-	g.PATCH("/patch", func(c *Ctx) error { return c.String(http.StatusOK, "PATCH") })
-	g.DELETE("/delete", func(c *Ctx) error { return c.String(http.StatusOK, "DELETE") })
-	g.OPTIONS("/options", func(c *Ctx) error { return c.String(http.StatusOK, "OPTIONS") })
-	g.HEAD("/head", func(c *Ctx) error { return c.String(http.StatusOK, "") })
+	g.GET("/get", func(c Ctx) error { return c.String(http.StatusOK, "GET") })
+	g.POST("/post", func(c Ctx) error { return c.String(http.StatusOK, "POST") })
+	g.PUT("/put", func(c Ctx) error { return c.String(http.StatusOK, "PUT") })
+	g.PATCH("/patch", func(c Ctx) error { return c.String(http.StatusOK, "PATCH") })
+	g.DELETE("/delete", func(c Ctx) error { return c.String(http.StatusOK, "DELETE") })
+	g.OPTIONS("/options", func(c Ctx) error { return c.String(http.StatusOK, "OPTIONS") })
+	g.HEAD("/head", func(c Ctx) error { return c.String(http.StatusOK, "") })
 
 	tests := []struct{ method, path, want string }{
 		{http.MethodPost, "/r/post", "POST"},

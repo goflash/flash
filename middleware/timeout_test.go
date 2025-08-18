@@ -11,7 +11,7 @@ import (
 
 func TestTimeoutMiddleware(t *testing.T) {
 	a := flash.New()
-	a.GET("/slow", func(c *flash.Ctx) error {
+	a.GET("/slow", func(c flash.Ctx) error {
 		time.Sleep(50 * time.Millisecond)
 		return c.String(http.StatusOK, "ok")
 	}, Timeout(TimeoutConfig{Duration: 10 * time.Millisecond}))
@@ -27,10 +27,10 @@ func TestTimeoutMiddleware(t *testing.T) {
 func TestTimeoutOnTimeoutAndCustomErrorResponse(t *testing.T) {
 	called := false
 	a := flash.New()
-	a.GET("/slow2", func(c *flash.Ctx) error {
+	a.GET("/slow2", func(c flash.Ctx) error {
 		time.Sleep(20 * time.Millisecond)
 		return c.String(http.StatusOK, "ok")
-	}, Timeout(TimeoutConfig{Duration: 5 * time.Millisecond, OnTimeout: func(c *flash.Ctx) { called = true }, ErrorResponse: func(c *flash.Ctx) error { return c.String(599, "custom") }}))
+	}, Timeout(TimeoutConfig{Duration: 5 * time.Millisecond, OnTimeout: func(c flash.Ctx) { called = true }, ErrorResponse: func(c flash.Ctx) error { return c.String(599, "custom") }}))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/slow2", nil)
@@ -46,7 +46,7 @@ func TestTimeoutOnTimeoutAndCustomErrorResponse(t *testing.T) {
 func TestTimeoutDefaultDurationNoTimeout(t *testing.T) {
 	a := flash.New()
 	// Duration is zero -> defaults internally to 5s; handler returns immediately so no timeout
-	a.GET("/fast", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") }, Timeout(TimeoutConfig{}))
+	a.GET("/fast", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") }, Timeout(TimeoutConfig{}))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/fast", nil)

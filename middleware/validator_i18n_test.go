@@ -11,7 +11,7 @@ import (
 )
 
 // simple handler that triggers validation and returns mapped field errors
-func validateHandler(c *flash.Ctx) error {
+func validateHandler(c flash.Ctx) error {
 	type U struct {
 		Name string `json:"name" validate:"required"`
 	}
@@ -104,7 +104,7 @@ func TestValidatorI18n_UsesLocaleFromCtx(t *testing.T) {
 	app := flash.New()
 	app.Use(ValidatorI18n(ValidatorI18nConfig{
 		DefaultLocale: "en",
-		LocaleFromCtx: func(c *flash.Ctx) string { return "es" },
+		LocaleFromCtx: func(c flash.Ctx) string { return "es" },
 		MessageFuncFor: func(locale string) func(validator.FieldError) string {
 			if locale == "es" {
 				return func(validator.FieldError) string { return "ES_FROM_CTX" }

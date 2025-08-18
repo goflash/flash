@@ -29,7 +29,7 @@ func CORS(cfg CORSConfig) flash.Middleware {
 	origins := strings.Join(cfg.Origins, ", ")
 
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			if origins != "" {
 				c.Header("Access-Control-Allow-Origin", origins)
 			}

@@ -11,7 +11,7 @@ import (
 )
 
 func TestUseNoArgsNoop(t *testing.T) {
-	a := New()
+	a := New().(*DefaultApp)
 	before := len(a.middleware)
 	a.Use()
 	if len(a.middleware) != before {
@@ -22,9 +22,9 @@ func TestUseNoArgsNoop(t *testing.T) {
 func TestAppGETAndMiddlewareAndErrorHandler(t *testing.T) {
 	a := New()
 	called := 0
-	a.Use(func(next Handler) Handler { return func(c *Ctx) error { called++; return next(c) } })
+	a.Use(func(next Handler) Handler { return func(c Ctx) error { called++; return next(c) } })
 
-	a.GET("/ping", func(c *Ctx) error { return c.String(http.StatusOK, "pong") })
+	a.GET("/ping", func(c Ctx) error { return c.String(http.StatusOK, "pong") })
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	rec := httptest.NewRecorder()
@@ -53,7 +53,7 @@ func TestAppNotFoundAndMethodNA(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/ping", nil)
 
-	a.GET("/ping", func(c *Ctx) error { return c.String(http.StatusOK, "pong") })
+	a.GET("/ping", func(c Ctx) error { return c.String(http.StatusOK, "pong") })
 
 	a.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
@@ -69,7 +69,7 @@ func TestHandleHTTPAndMountAndStatic(t *testing.T) {
 	a.Mount("/m", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "m") }))
 	// Static: use httptest's FileServer like behavior by writing a simple handler under prefix
 	// Here we simulate by registering a GET that matches the internal pattern
-	a.GET("/files/*filepath", func(c *Ctx) error { return c.String(http.StatusOK, "file") })
+	a.GET("/files/*filepath", func(c Ctx) error { return c.String(http.StatusOK, "file") })
 
 	tests := []struct{ path, want string }{
 		{"/std", "std"},
@@ -88,7 +88,7 @@ func TestHandleHTTPAndMountAndStatic(t *testing.T) {
 
 func TestANYRegistersAllMethods(t *testing.T) {
 	a := New()
-	a.ANY("/ping", func(c *Ctx) error { return c.String(http.StatusOK, c.Method()) })
+	a.ANY("/ping", func(c Ctx) error { return c.String(http.StatusOK, c.Method()) })
 	methods := []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions, http.MethodHead}
 	for _, m := range methods {
 		rec := httptest.NewRecorder()
@@ -102,8 +102,8 @@ func TestANYRegistersAllMethods(t *testing.T) {
 
 func TestCustomNotFoundAndMethodNAAndOnError(t *testing.T) {
 	a := New()
-	a.NotFound = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404); io.WriteString(w, "NF") })
-	a.MethodNA = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(405); io.WriteString(w, "MNA") })
+	a.SetNotFound(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404); io.WriteString(w, "NF") }))
+	a.SetMethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(405); io.WriteString(w, "MNA") }))
 
 	// NotFound
 	rec := httptest.NewRecorder()
@@ -114,7 +114,7 @@ func TestCustomNotFoundAndMethodNAAndOnError(t *testing.T) {
 	}
 
 	// MethodNA
-	a.GET("/x", func(c *Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/x", func(c Ctx) error { return c.String(http.StatusOK, "ok") })
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/x", nil)
 	a.ServeHTTP(rec, req)
@@ -124,7 +124,7 @@ func TestCustomNotFoundAndMethodNAAndOnError(t *testing.T) {
 
 	// OnError default 500
 	a = New()
-	a.GET("/e", func(c *Ctx) error { return io.ErrUnexpectedEOF })
+	a.GET("/e", func(c Ctx) error { return io.ErrUnexpectedEOF })
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/e", nil)
 	a.ServeHTTP(rec, req)
@@ -134,8 +134,8 @@ func TestCustomNotFoundAndMethodNAAndOnError(t *testing.T) {
 
 	// Custom OnError
 	a = New()
-	a.OnError = func(c *Ctx, err error) { _ = c.String(418, "teapot") }
-	a.GET("/e", func(c *Ctx) error { return io.ErrUnexpectedEOF })
+	a.SetErrorHandler(func(c Ctx, err error) { _ = c.String(418, "teapot") })
+	a.GET("/e", func(c Ctx) error { return io.ErrUnexpectedEOF })
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/e", nil)
 	a.ServeHTTP(rec, req)
@@ -146,7 +146,7 @@ func TestCustomNotFoundAndMethodNAAndOnError(t *testing.T) {
 
 func TestHandleCustomMethod(t *testing.T) {
 	a := New()
-	a.Handle("PURGE", "/c", func(c *Ctx) error { return c.String(http.StatusOK, "purged") })
+	a.Handle("PURGE", "/c", func(c Ctx) error { return c.String(http.StatusOK, "purged") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("PURGE", "/c", nil)
 	a.ServeHTTP(rec, req)
@@ -172,7 +172,7 @@ func TestStaticServesFiles(t *testing.T) {
 }
 
 func TestSetLoggerAndLoggerFallback(t *testing.T) {
-	a := New()
+	a := New().(*DefaultApp)
 	// SetLogger path
 	l := slog.Default()
 	a.SetLogger(l)
@@ -187,7 +187,7 @@ func TestSetLoggerAndLoggerFallback(t *testing.T) {
 }
 
 func TestUseNoopOnEmpty(t *testing.T) {
-	a := New()
+	a := New().(*DefaultApp)
 	// should not panic and should not change middleware length
 	before := len(a.middleware)
 	a.Use()

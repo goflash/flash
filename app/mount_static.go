@@ -8,11 +8,13 @@ import (
 
 // HandleHTTP mounts a net/http.Handler on a specific HTTP method and path.
 // This allows interoperability with standard library handlers.
-func (a *App) HandleHTTP(method, path string, h http.Handler) { a.router.Handler(method, path, h) }
+func (a *DefaultApp) HandleHTTP(method, path string, h http.Handler) {
+	a.router.Handler(method, path, h)
+}
 
 // Mount mounts a net/http.Handler for all common HTTP methods (GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD)
 // under the given path. Useful for mounting sub-routers or third-party handlers.
-func (a *App) Mount(path string, h http.Handler) {
+func (a *DefaultApp) Mount(path string, h http.Handler) {
 	for _, m := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions, http.MethodHead} {
 		a.router.Handler(m, path, h)
 	}
@@ -20,12 +22,12 @@ func (a *App) Mount(path string, h http.Handler) {
 
 // Static serves files from one or more directories under a URL prefix for GET and HEAD requests.
 // If multiple directories are provided (via StaticDirs), files are resolved in order, first match wins.
-func (a *App) Static(prefix, dir string) { a.StaticDirs(prefix, dir) }
+func (a *DefaultApp) Static(prefix, dir string) { a.StaticDirs(prefix, dir) }
 
 // StaticDirs serves files from multiple directories under the same URL prefix (GET and HEAD).
 // Directories are searched in order; the first existing file is served.
 // This mirrors frameworks like Fiber where multiple folders can back the same route.
-func (a *App) StaticDirs(prefix string, dirs ...string) {
+func (a *DefaultApp) StaticDirs(prefix string, dirs ...string) {
 	prefix = cleanPath(prefix)
 	if !strings.HasSuffix(prefix, "/") {
 		prefix += "/"

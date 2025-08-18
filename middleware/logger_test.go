@@ -25,7 +25,7 @@ func TestLoggerMiddlewareEmitsLog(t *testing.T) {
 	h := &captureHandler{}
 	a.SetLogger(slog.New(h))
 	a.Use(Logger())
-	a.GET("/x", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/x", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	a.ServeHTTP(rec, req)
@@ -41,7 +41,7 @@ func TestLoggerDefaultStatusAndRequestIDAttr(t *testing.T) {
 	// Ensure RequestID runs within the request so request_id is available when Logger logs
 	a.Use(Logger(), RequestID())
 	// Handler that does not write any response headers/body
-	a.GET("/y", func(c *flash.Ctx) error { return nil })
+	a.GET("/y", func(c flash.Ctx) error { return nil })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/y", nil)
 	a.ServeHTTP(rec, req)
@@ -77,7 +77,7 @@ func TestLoggerDefaultStatusAndRequestIDAttr(t *testing.T) {
 func TestLoggerStatusDefaultWhenNoWrite(t *testing.T) {
 	a := flash.New()
 	a.Use(Logger())
-	a.GET("/noop", func(c *flash.Ctx) error { return nil })
+	a.GET("/noop", func(c flash.Ctx) error { return nil })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/noop", nil)
 	a.ServeHTTP(rec, req)

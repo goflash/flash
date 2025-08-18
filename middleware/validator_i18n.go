@@ -16,7 +16,7 @@ type ValidatorI18nConfig struct {
 	DefaultLocale string
 	// LocaleFromCtx returns the desired locale for a request.
 	// Default: use lowercased route param ":lang" if present.
-	LocaleFromCtx func(c *flash.Ctx) string
+	LocaleFromCtx func(c flash.Ctx) string
 	// MessageFuncFor returns a function that translates a FieldError into a message
 	// for a given locale. The application typically closes over its prepared
 	// translators and returns: func(fe validator.FieldError) string { return fe.Translate(trans) }.
@@ -44,7 +44,7 @@ func ValidatorI18n(cfg ValidatorI18nConfig) flash.Middleware {
 	}
 
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			locale := cfg.DefaultLocale
 			if cfg.LocaleFromCtx != nil {
 				if l := cfg.LocaleFromCtx(c); l != "" {

@@ -12,7 +12,7 @@ import (
 func TestRequestIDSetsHeaderAndContext(t *testing.T) {
 	a := flash.New()
 	a.Use(RequestID())
-	a.GET("/", func(c *flash.Ctx) error {
+	a.GET("/", func(c flash.Ctx) error {
 		if _, ok := RequestIDFromContext(c.Context()); !ok {
 			t.Fatalf("request id missing")
 		}
@@ -32,7 +32,7 @@ func TestRequestIDSetsHeaderAndContext(t *testing.T) {
 func TestRequestIDCustomHeader(t *testing.T) {
 	a := flash.New()
 	a.Use(RequestID(RequestIDConfig{Header: "X-CID"}))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	a.ServeHTTP(rec, req)
@@ -43,7 +43,7 @@ func TestRequestIDCustomHeader(t *testing.T) {
 
 func TestRequestIDFromContextMissing(t *testing.T) {
 	a := flash.New()
-	a.GET("/", func(c *flash.Ctx) error {
+	a.GET("/", func(c flash.Ctx) error {
 		if _, ok := RequestIDFromContext(c.Context()); ok {
 			t.Fatalf("expected no request id")
 		}

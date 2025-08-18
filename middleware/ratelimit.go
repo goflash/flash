@@ -59,7 +59,7 @@ func (l *SimpleIPLimiter) Allow(key string) (bool, time.Duration) {
 // If the request is not allowed, responds with 429 Too Many Requests and optional Retry-After header.
 func RateLimit(l Limiter) flash.Middleware {
 	return func(next flash.Handler) flash.Handler {
-		return func(c *flash.Ctx) error {
+		return func(c flash.Ctx) error {
 			ip := ""
 			if r := c.Request(); r != nil {
 				ip = clientIP(r)

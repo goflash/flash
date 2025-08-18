@@ -13,7 +13,7 @@ import (
 func TestBufferSetsContentLengthAndFlushes(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 128, MaxSize: 1024}))
-	a.GET("/", func(c *flash.Ctx) error { return c.String(http.StatusOK, "hello") })
+	a.GET("/", func(c flash.Ctx) error { return c.String(http.StatusOK, "hello") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -33,7 +33,7 @@ func TestBufferSwitchesToStreamingOnLargeResponse(t *testing.T) {
 	for i := range big {
 		big[i] = 'x'
 	}
-	a.GET("/", func(c *flash.Ctx) error { _, _ = c.Send(http.StatusOK, "text/plain", big); return nil })
+	a.GET("/", func(c flash.Ctx) error { _, _ = c.Send(http.StatusOK, "text/plain", big); return nil })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -47,7 +47,7 @@ func TestBufferSwitchesToStreamingOnLargeResponse(t *testing.T) {
 func TestBufferHEADNoBody(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 0, MaxSize: 0}))
-	a.HEAD("/h", func(c *flash.Ctx) error { return c.String(http.StatusOK, "") })
+	a.HEAD("/h", func(c flash.Ctx) error { return c.String(http.StatusOK, "") })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodHead, "/h", nil)
 	a.ServeHTTP(rec, req)
@@ -59,7 +59,7 @@ func TestBufferHEADNoBody(t *testing.T) {
 func TestBufferFlushForcesStreaming(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 4, MaxSize: 8}))
-	a.GET("/sse", func(c *flash.Ctx) error {
+	a.GET("/sse", func(c flash.Ctx) error {
 		c.ResponseWriter().(http.Flusher).Flush() // call flush early
 		_, _ = c.Send(http.StatusOK, "text/plain", []byte("data"))
 		return nil
@@ -74,7 +74,7 @@ func TestBufferFlushForcesStreaming(t *testing.T) {
 func TestStrconvItoaCoverage(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/n", func(c *flash.Ctx) error {
+	a.GET("/n", func(c flash.Ctx) error {
 		_, _ = c.ResponseWriter().Write([]byte("12345")) // no explicit Content-Length
 		return nil
 	})
@@ -89,7 +89,7 @@ func TestStrconvItoaCoverage(t *testing.T) {
 func TestBufferFirstWriteExceedsMaxSizeStreamsImmediately(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 0, MaxSize: 2})) // MaxSize smaller than first write
-	a.GET("/stream", func(c *flash.Ctx) error {
+	a.GET("/stream", func(c flash.Ctx) error {
 		_, _ = c.ResponseWriter().Write([]byte("abc")) // len=3 > MaxSize, with empty buffer
 		return nil
 	})
@@ -110,7 +110,7 @@ func TestBufferFirstWriteExceedsMaxSizeStreamsImmediately(t *testing.T) {
 func TestBufferBufferedThenOverflowFlushesAndStreams(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 0, MaxSize: 3}))
-	a.GET("/mix", func(c *flash.Ctx) error {
+	a.GET("/mix", func(c flash.Ctx) error {
 		w := c.ResponseWriter()
 		_, _ = w.Write([]byte("ab"))  // buffered
 		_, _ = w.Write([]byte("cde")) // overflow -> flush "ab" then stream "cde"
@@ -133,7 +133,7 @@ func TestBufferBufferedThenOverflowFlushesAndStreams(t *testing.T) {
 func TestBufferCloseNoWritesDefaultsTo200(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/nowrite", func(c *flash.Ctx) error { return nil })
+	a.GET("/nowrite", func(c flash.Ctx) error { return nil })
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/nowrite", nil)
 	a.ServeHTTP(rec, req)
@@ -148,7 +148,7 @@ func TestBufferCloseNoWritesDefaultsTo200(t *testing.T) {
 func TestBufferCloseNoWritesWithPresetStatus(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/nostatusbody", func(c *flash.Ctx) error {
+	a.GET("/nostatusbody", func(c flash.Ctx) error {
 		// Set status on the buffered ResponseWriter so Buffer.Close() will honor it
 		c.ResponseWriter().WriteHeader(http.StatusNoContent)
 		return nil
@@ -167,7 +167,7 @@ func TestBufferCloseNoWritesWithPresetStatus(t *testing.T) {
 func TestBufferFlushWithBufferedDataWritesAndNoContentLength(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/flush-buf", func(c *flash.Ctx) error {
+	a.GET("/flush-buf", func(c flash.Ctx) error {
 		w := c.ResponseWriter()
 		_, _ = w.Write([]byte("abc")) // buffered
 		w.(http.Flusher).Flush()      // flush buffered bytes without CL
@@ -190,7 +190,7 @@ func TestBufferFlushWithBufferedDataWritesAndNoContentLength(t *testing.T) {
 func TestBufferFlushWithoutAnyWritesSetsHeaderAndStreams(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/flush-empty", func(c *flash.Ctx) error {
+	a.GET("/flush-empty", func(c flash.Ctx) error {
 		c.ResponseWriter().(http.Flusher).Flush() // no prior writes, buf==nil path
 		return nil
 	})
@@ -208,7 +208,7 @@ func TestBufferFlushWithoutAnyWritesSetsHeaderAndStreams(t *testing.T) {
 func TestBufferEnsureBufEarlyReturn(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 0, MaxSize: 0}))
-	a.GET("/twowrites", func(c *flash.Ctx) error {
+	a.GET("/twowrites", func(c flash.Ctx) error {
 		w := c.ResponseWriter()
 		_, _ = w.Write([]byte("hi"))
 		_, _ = w.Write([]byte("there"))
@@ -225,7 +225,7 @@ func TestBufferEnsureBufEarlyReturn(t *testing.T) {
 func TestBufferNoContentLengthWhenEncodingPreset(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/enc", func(c *flash.Ctx) error {
+	a.GET("/enc", func(c flash.Ctx) error {
 		c.Header("Content-Encoding", "br")
 		_, _ = c.ResponseWriter().Write([]byte("abc"))
 		return nil
@@ -241,7 +241,7 @@ func TestBufferNoContentLengthWhenEncodingPreset(t *testing.T) {
 func TestBufferFlushTwiceCoversStreamingBranch(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer(BufferConfig{InitialSize: 4, MaxSize: 8}))
-	a.GET("/flush2", func(c *flash.Ctx) error {
+	a.GET("/flush2", func(c flash.Ctx) error {
 		f := c.ResponseWriter().(http.Flusher)
 		f.Flush()
 		f.Flush()
@@ -259,7 +259,7 @@ func TestBufferFlushTwiceCoversStreamingBranch(t *testing.T) {
 func TestBufferZeroLengthSetsCLZero(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/zero", func(c *flash.Ctx) error {
+	a.GET("/zero", func(c flash.Ctx) error {
 		_, _ = c.ResponseWriter().Write([]byte{})
 		return nil
 	})
@@ -288,9 +288,9 @@ func (w *failOnFirstWriteRW) Write(p []byte) (int, error) {
 func TestBufferSwitchToStreamingFlushBufferedWriteError(t *testing.T) {
 	a := flash.New()
 	called := false
-	a.OnError = func(_ *flash.Ctx, err error) { called = true }
+	a.SetErrorHandler(func(_ flash.Ctx, err error) { called = true })
 	a.Use(Buffer(BufferConfig{InitialSize: 0, MaxSize: 3}))
-	a.GET("/e", func(c *flash.Ctx) error {
+	a.GET("/e", func(c flash.Ctx) error {
 		w := c.ResponseWriter()
 		// write small chunk to buffer
 		if _, err := w.Write([]byte("ab")); err != nil {
@@ -312,7 +312,7 @@ func TestBufferSwitchToStreamingFlushBufferedWriteError(t *testing.T) {
 func TestBufferRespectsPreSetContentLength(t *testing.T) {
 	a := flash.New()
 	a.Use(Buffer())
-	a.GET("/preset", func(c *flash.Ctx) error {
+	a.GET("/preset", func(c flash.Ctx) error {
 		c.Header("Content-Length", "99") // simulate pre-set length
 		_, _ = c.ResponseWriter().Write([]byte("abc"))
 		return nil
