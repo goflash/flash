@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 func TestRateLimitBlocksAfterCapacity(t *testing.T) {

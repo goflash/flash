@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 func TestRecoverMiddleware(t *testing.T) {

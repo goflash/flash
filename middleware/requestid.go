@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 // RequestIDConfig configures the RequestID middleware.

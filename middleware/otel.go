@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -16,7 +16,7 @@ import (
 // OTelConfig configures the OpenTelemetry middleware.
 // All fields are optional; sensible defaults are used when not provided.
 type OTelConfig struct {
-	// Tracer to use. If nil, otel.Tracer("github.com/goflash/flash") is used.
+	// Tracer to use. If nil, otel.Tracer("github.com/goflash/flash/v1") is used.
 	Tracer trace.Tracer
 	// Propagator to extract context. If nil, otel.GetTextMapPropagator() is used.
 	Propagator propagation.TextMapPropagator
@@ -49,7 +49,7 @@ func OTel(serviceName string, extraAttrs ...attribute.KeyValue) flash.Middleware
 func OTelWithConfig(cfg OTelConfig) flash.Middleware {
 	tracer := cfg.Tracer
 	if tracer == nil {
-		tracer = otel.Tracer("github.com/goflash/flash")
+		tracer = otel.Tracer("github.com/goflash/flash/v1")
 	}
 	prop := cfg.Propagator
 	if prop == nil {

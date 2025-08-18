@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 func TestCORSPreflightAndHeaders(t *testing.T) {

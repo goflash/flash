@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 type sessionContextKey struct{}

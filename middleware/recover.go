@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 // Recover returns middleware that recovers from panics in handlers and returns a 500 Internal Server Error.

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/goflash/flash/validate"
+	"github.com/goflash/flash/v1/validate"
 )
 
 // mapJSONStrictError converts encoding/json errors into field errors when possible.

@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/goflash/flash/ctx"
+	"github.com/goflash/flash/v1/ctx"
 )
 
 // defaultErrorHandler is the default error handler for goflash applications.

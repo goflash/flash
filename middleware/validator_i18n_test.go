@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	validator "github.com/go-playground/validator/v10"
-	"github.com/goflash/flash"
-	"github.com/goflash/flash/validate"
+	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v1/validate"
 )
 
 // simple handler that triggers validation and returns mapped field errors

@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/goflash/flash/ctx"
+	"github.com/goflash/flash/v1/ctx"
 	"github.com/julienschmidt/httprouter"
 )
 

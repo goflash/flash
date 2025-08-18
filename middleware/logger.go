@@ -3,8 +3,8 @@ package middleware
 import (
 	"time"
 
-	"github.com/goflash/flash"
-	"github.com/goflash/flash/logctx"
+	"github.com/goflash/flash/v1"
+	"github.com/goflash/flash/v1/ctx"
 )
 
 // Logger returns middleware that logs each request using slog, including method, path, status, duration, remote address, and user agent.
@@ -27,7 +27,7 @@ func Logger() flash.Middleware {
 				remote = r.RemoteAddr
 			}
 
-			l := logctx.LoggerFromContext(c.Context())
+			l := ctx.LoggerFromContext(c.Context())
 
 			attrs := []any{
 				"method", c.Method(),

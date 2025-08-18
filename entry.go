@@ -1,8 +1,8 @@
 package flash
 
 import (
-	"github.com/goflash/flash/app"
-	"github.com/goflash/flash/ctx"
+	"github.com/goflash/flash/v1/app"
+	"github.com/goflash/flash/v1/ctx"
 )
 
 // Group is a route group for organizing routes. Re-exported from app.Group for convenience.

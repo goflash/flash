@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 // CSRFConfig configures the CSRF middleware.

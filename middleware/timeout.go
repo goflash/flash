@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/goflash/flash"
+	"github.com/goflash/flash/v1"
 )
 
 // TimeoutConfig configures the timeout middleware.

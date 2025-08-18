@@ -28,7 +28,7 @@ import (
     "log"
     "net/http"
 
-    "github.com/goflash/flash"
+    "github.com/goflash/flash/v1"
     mw "github.com/goflash/flash/middleware"
 )
 

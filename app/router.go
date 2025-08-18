@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/goflash/flash/logctx"
+	"github.com/goflash/flash/v1/ctx"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -82,13 +82,13 @@ func (a *App) handle(method, path string, h Handler, mws ...Middleware) {
 	pattern := path
 	a.router.Handle(method, path, func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		// Inject app logger into request context for structured logging.
-		r = r.WithContext(logctx.ContextWithLogger(r.Context(), a.Logger()))
-		ctx := a.pool.Get().(*Ctx)
-		ctx.Reset(w, r, ps, pattern)
-		if err := final(ctx); err != nil {
-			a.OnError(ctx, err)
+		r = r.WithContext(ctx.ContextWithLogger(r.Context(), a.Logger()))
+		ctxFromPool := a.pool.Get().(*Ctx)
+		ctxFromPool.Reset(w, r, ps, pattern)
+		if err := final(ctxFromPool); err != nil {
+			a.OnError(ctxFromPool, err)
 		}
-		ctx.Finish()
-		a.pool.Put(ctx)
+		ctxFromPool.Finish()
+		a.pool.Put(ctxFromPool)
 	})
 }
