@@ -56,13 +56,13 @@ func New() App {
 	app.SetErrorHandler(defaultErrorHandler)
 	app.SetNotFound(http.NotFoundHandler())
 	app.SetMethodNotAllowed(methodNotAllowedHandler())
-	app.logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	app.SetLogger(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	app.router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		app.NotFound.ServeHTTP(w, r)
+		app.NotFoundHandler().ServeHTTP(w, r)
 	})
 	app.router.MethodNotAllowed = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		app.MethodNA.ServeHTTP(w, r)
+		app.MethodNotAllowedHandler().ServeHTTP(w, r)
 	})
 
 	return app
@@ -100,3 +100,8 @@ func (a *DefaultApp) SetNotFound(h http.Handler)     { a.NotFound = h }
 func (a *DefaultApp) SetMethodNotAllowed(h http.Handler) {
 	a.MethodNA = h
 }
+
+// Getters to satisfy App interface without exposing fields when used as interface.
+func (a *DefaultApp) ErrorHandler() ErrorHandler            { return a.OnError }
+func (a *DefaultApp) NotFoundHandler() http.Handler         { return a.NotFound }
+func (a *DefaultApp) MethodNotAllowedHandler() http.Handler { return a.MethodNA }

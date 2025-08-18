@@ -56,6 +56,9 @@ type Ctx interface {
 	Send(status int, contentType string, b []byte) (int, error)
 	WroteHeader() bool
 
+	// BindJSON decodes request body JSON into v with strict defaults; see BindJSONOptions.
+	BindJSON(v any, opts ...BindJSONOptions) error
+
 	// Utilities
 	Get(key any, def ...any) any
 	Set(key, value any) Ctx

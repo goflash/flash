@@ -86,7 +86,7 @@ func (a *DefaultApp) handle(method, path string, h Handler, mws ...Middleware) {
 		concrete := a.pool.Get().(*ctx.DefaultContext)
 		concrete.Reset(w, r, ps, pattern)
 		if err := final(concrete); err != nil {
-			a.OnError(concrete, err)
+			a.ErrorHandler()(concrete, err)
 		}
 		concrete.Finish()
 		a.pool.Put(concrete)
