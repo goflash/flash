@@ -2,7 +2,7 @@
 
 **A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.**
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/goflash/flash.svg)](https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.1)
+[![Go Reference](https://pkg.go.dev/badge/github.com/goflash/flash.svg)](https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.2)
 <a href="https://goreportcard.com/report/github.com/goflash/flash">
     <img src="https://img.shields.io/badge/%F0%9F%93%9D%20Go Report-A%2B-75C46B?style=flat-square">
 </a>
