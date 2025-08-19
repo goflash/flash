@@ -84,139 +84,7 @@ func main() {
 
 ---
 
-## Type-Safe Parameter Helpers
-
-GoFlash provides convenient type-safe helpers for parsing query and path parameters, eliminating the need for manual string parsing and error handling:
-
-```go
-app.GET("/users/:id", func(c *flash.Ctx) error {
-    // Type-safe path parameter parsing with defaults
-    userID := c.ParamInt("id", 0)
-    if userID == 0 {
-        return c.JSON(map[string]string{"error": "invalid user ID"})
-    }
-    
-    // Type-safe query parameter parsing
-    page := c.QueryInt("page", 1)
-    perPage := c.QueryInt("per_page", 10)
-    includeDetails := c.QueryBool("details", false)
-    
-    return c.JSON(map[string]interface{}{
-        "user_id": userID,
-        "page": page,
-        "per_page": perPage,
-        "include_details": includeDetails,
-    })
-})
-```
-
-### Available Helpers
-
-**Query Parameters:**
-- `QueryInt(key, default)` - Parse as int
-- `QueryInt64(key, default)` - Parse as int64  
-- `QueryFloat64(key, default)` - Parse as float64
-- `QueryBool(key, default)` - Parse as bool (accepts "true", "1", "yes", "on")
-- `QueryUint(key, default)` - Parse as uint
-- `QueryUint64(key, default)` - Parse as uint64
-
-**Path Parameters:**
-- `ParamInt(name, default)` - Parse as int
-- `ParamInt64(name, default)` - Parse as int64
-- `ParamFloat64(name, default)` - Parse as float64
-- `ParamUint(name, default)` - Parse as uint
-- `ParamUint64(name, default)` - Parse as uint64
-
-All helpers return the default value if the parameter is missing or invalid, making your code more robust and concise.
-
----
-
 ## Philosophy & Overview
-    
-    // Type-safe query parameter parsing
-    page := c.QueryInt("page", 1)
-    perPage := c.QueryInt("per_page", 10)
-    includeDetails := c.QueryBool("details", false)
-    
-    return c.JSON(map[string]interface{}{
-        "user_id": userID,
-        "page": page,
-        "per_page": perPage,
-        "include_details": includeDetails,
-    })
-})
-```
-
-### Available Helpers
-
-**Query Parameters:**
-- `QueryInt(key, default)` - Parse as int
-- `QueryInt64(key, default)` - Parse as int64  
-- `QueryFloat64(key, default)` - Parse as float64
-- `QueryBool(key, default)` - Parse as bool (accepts "true", "1", "yes", "on")
-- `QueryUint(key, default)` - Parse as uint
-- `QueryUint64(key, default)` - Parse as uint64
-
-**Path Parameters:**
-- `ParamInt(name, default)` - Parse as int
-- `ParamInt64(name, default)` - Parse as int64
-- `ParamFloat64(name, default)` - Parse as float64
-- `ParamUint(name, default)` - Parse as uint
-- `ParamUint64(name, default)` - Parse as uint64
-
-All helpers return the default value if the parameter is missing or invalid, making your code more robust and concise.
-
----
-
-## Type-Safe Parameter Helpers
-
-GoFlash provides convenient type-safe helpers for parsing query and path parameters, eliminating the need for manual string parsing and error handling:
-
-```go
-app.GET("/users/:id", func(c *flash.Ctx) error {
-    // Type-safe path parameter parsing with defaults
-    userID := c.ParamInt("id", 0)
-    if userID == 0 {
-        return c.JSON(map[string]string{"error": "invalid user ID"})
-    }
-    
-    // Type-safe query parameter parsing
-    page := c.QueryInt("page", 1)
-    perPage := c.QueryInt("per_page", 10)
-    includeDetails := c.QueryBool("details", false)
-    
-    return c.JSON(map[string]interface{}{
-        "user_id": userID,
-        "page": page,
-        "per_page": perPage,
-        "include_details": includeDetails,
-    })
-})
-```
-
-### Available Helpers
-
-**Query Parameters:**
-- `QueryInt(key, default)` - Parse as int
-- `QueryInt64(key, default)` - Parse as int64  
-- `QueryFloat64(key, default)` - Parse as float64
-- `QueryBool(key, default)` - Parse as bool (accepts "true", "1", "yes", "on")
-- `QueryUint(key, default)` - Parse as uint
-- `QueryUint64(key, default)` - Parse as uint64
-
-**Path Parameters:**
-- `ParamInt(name, default)` - Parse as int
-- `ParamInt64(name, default)` - Parse as int64
-- `ParamFloat64(name, default)` - Parse as float64
-- `ParamUint(name, default)` - Parse as uint
-- `ParamUint64(name, default)` - Parse as uint64
-
-All helpers return the default value if the parameter is missing or invalid, making your code more robust and concise.
-
----
-
-## Overview
->>>>>>> 98d11f1 (feat: add type-safe query and path parameter helpers)
 
 - **🎯 Purpose:** Productive HTTP framework with a tiny, composable core and batteries-included middlewares.
 - **📐 Philosophy:** <u>Standard library first</u>, high performance without gimmicks, small API surface.
@@ -233,7 +101,6 @@ All helpers return the default value if the parameter is missing or invalid, mak
 
 ## Features
 
-<<<<<<< HEAD
 | Feature                    | Description & Rationale                                                                                                                                           |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.                                                                |
@@ -252,29 +119,6 @@ All helpers return the default value if the parameter is missing or invalid, mak
 | **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated.                                                  |
 | **Modern Go**              | Designed for Go 1.22+, leverages context, slog, and idiomatic error handling.                                                                                     |
 | **Examples**               | Real-world, runnable examples for features like cookies, templates, WebSockets, shutdown, and more (see [goflash/examples](https://github.com/goflash/examples)). |
-=======
-| Feature                    | Description & Rationale                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.               |
-| **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.         |
-| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, `BindJSON`, `JSON`, `String`, `Header`, etc.               |
-| **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                   |
-| **Built-in middleware**    | Logger, Recover, CORS, Timeout, OpenTelemetry, Sessions, Gzip, Request ID, Rate Limit, Buffer.                   |
-| **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                   |
-| **Static files**           | Serve static assets with `App.Static` or multiple folders with `App.StaticDirs` (first match wins).              |
-| **Hooks & error handling** | Custom `OnError`, `NotFound`, and `MethodNA` for full control over error and 404/405 responses.                  |
-| **Mounting/Interop**       | Mount any `http.Handler` or ServeMux; easy migration and integration with legacy or third-party code.            |
-| **Pluggable logging**      | Use any slog-compatible logger (slog, zap, zerolog); logger is injected into request context.                    |
-| **Observability**          | Built-in OpenTelemetry tracing middleware for distributed tracing and metrics.                                   |
-| **Session management**     | In-memory sessions with cookie/header ID; extensible for custom stores.                                          |
-| **Performance**            | Pooled buffers, precomputed Content-Length, pooled gzip writers, and efficient write buffering.                  |
-| **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated. |
-| **Modern Go**              | Designed for Go 1.22+, leverages context, slog, and idiomatic error handling.                                    |
-| **Examples**               | Real-world, runnable examples for all features: cookies, templates, WebSockets, shutdown, and more.              |
-| **Type-safe parameters**   | Convenient helpers for parsing query and path parameters: `QueryInt()`, `QueryBool()`, `ParamInt()`, etc.        |
-
-> Tip 💡: Every feature is included to maximize developer productivity, safety, and performance, while keeping the API minimal and explicit. No hidden magic, no global state, no surprises.
->>>>>>> 98d11f1 (feat: add type-safe query and path parameter helpers)
 
 ### Performance highlights
 
@@ -352,7 +196,6 @@ Routing patterns and behavior follow julienschmidt/httprouter. See:
 
 flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request, designed for both ergonomics and performance. All helpers are explicit, chainable where appropriate, and safe for high-concurrency use.
 
-<<<<<<< HEAD
 | Method                                        | Purpose / Rationale                                                                                |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `Request()`                                   | Returns the underlying *http.Request for advanced/interop use.                                     |
@@ -522,29 +365,3 @@ Battle tested in private productions.
 </small>
 
 </div>
-=======
-| Method                       | Purpose / Rationale                                                                                |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Request()`                  | Returns the underlying *http.Request for advanced/interop use.                                     |
-| `SetRequest(r)`              | Replace the request (e.g., to propagate context or swap in a new request).                         |
-| `ResponseWriter()`           | Returns the underlying http.ResponseWriter for low-level control.                                  |
-| `SetResponseWriter(w)`       | Replace the underlying http.ResponseWriter (e.g., for gzip or buffer middleware).                  |
-| `WroteHeader()`              | Reports whether the response header has been written.                                              |
-| `Context()`                  | Returns the request context for cancellation, deadlines, tracing, etc.                             |
-| `Set(key, value)`            | Store a value on the request context (clones request with context.WithValue).                      |
-| `Get(key [,def])`            | Retrieve a value from the request context; returns def if provided and missing, else nil.          |
-| `Method()`                   | Returns the HTTP method (GET, POST, etc).                                                          |
-| `Path()`                     | Returns the request URL path.                                                                      |
-| `Route()`                    | Returns the matched route pattern (e.g., `/users/:id`).                                            |
-| `Param(name)`                | Returns a path parameter by name.                                                                  |
-| `Query(key)`                 | Returns a query string parameter by key.                                                           |
-| `Status(code)`               | Sets the response status code (chainable, does not write header yet).                              |
-| `StatusCode()`               | Returns the status code that will be written (or 200 if not set yet).                              |
-| `Header(key, value)`         | Sets a response header.                                                                            |
-| `SetJSONEscapeHTML(bool)`    | Controls whether JSON responses escape HTML (default true, for XSS safety).                        |
-| `JSON(v)`                    | Writes a value as JSON, sets Content-Type/Length, and status (uses pooled buffer for performance). |
-| `String(status, body)`       | Writes a plain text response with status and body.                                                 |
-| `Send(status, type, []byte)` | Writes raw bytes with status and content type.                                                     |
-| `BindJSON(&v)`               | Strictly decodes request body JSON into v (unknown fields rejected, closes body).                  |
-| `Finish()`
->>>>>>> 98d11f1 (feat: add type-safe query and path parameter helpers)
