@@ -1,10 +1,10 @@
 <h1 align="center">
-<img src="./public/images/logo-wide.png" alt="GoFlash Logo" width="600" />
-
-**A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.**
-</h1>
-
-<p align="center">
+    <a href="https://goflash.dev">
+        <picture>
+            <img alt="GoFlash Framework" src="./public/images/logo-wide.png" alt="GoFlash Logo" width="600" />
+        </picture>
+    </a>
+    <br />
     <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.4">
         <img src="https://pkg.go.dev/badge/github.com/goflash/flash.svg" alt="Go Reference">
     </a>
@@ -29,7 +29,21 @@
         <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/QHhGHtjjQG" alt="Discord">
       </a>
     </div>
+</h1>
+
+<p align="center">
+    <em>
+        <b>Flash</b> is a lean web framework inspired by Gin and Fiber. 
+        Built on the standard <code>net/http</code>,
+        <br>
+        it prioritizes developer speed and runtime performance - with a tiny API, 
+        clean ergonomics, and near‑zero allocations in hot paths.
+        <br>
+        Ship features fast without sacrificing reliability.
+    </em>
 </p>
+
+
 
 ---
 
