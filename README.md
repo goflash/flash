@@ -1,21 +1,36 @@
-<img src="./public/images/logo-wide.png" alt="GoFlash Logo" />
+<div style="text-align: center">
+<img src="./public/images/logo-wide.png" alt="GoFlash Logo" width="600" />
 
 **A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.**
+</div>
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/goflash/flash.svg)](https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.4)
-<a href="https://goreportcard.com/report/github.com/goflash/flash">
-    <img src="https://img.shields.io/badge/%F0%9F%93%9D%20Go Report-A%2B-75C46B?style=flat-square">
-</a>
-[![Coverage](https://codecov.io/gh/goflash/flash/graph/badge.svg?token=VRHM48HJ5L)](https://codecov.io/gh/goflash/flash)
-<a href="https://github.com/goflash/flash/actions?query=workflow%3ATest">
-    <img src="https://img.shields.io/github/actions/workflow/status/goflash/flash/test-coverage.yml?branch=main&label=%F0%9F%A7%AA%20Tests&style=flat-square&color=75C46B">
-</a>
-![Go Version](https://img.shields.io/badge/go-1.22%2B-00ADD8?logo=golang)
-<a href="https://docs.goflash.dev">
-    <img src="https://img.shields.io/badge/%F0%9F%92%A1%20GoFlash-docs-00ACD7.svg?style=flat-square">
-</a>
-![Status](https://img.shields.io/badge/status-beta-yellow)
-![License](https://img.shields.io/badge/license-MIT-blue)
+<div style="text-align:center">
+    <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.4">
+        <img src="https://pkg.go.dev/badge/github.com/goflash/flash.svg" alt="Go Reference">
+    </a>
+    <a href="https://goreportcard.com/report/github.com/goflash/flash">
+        <img src="https://img.shields.io/badge/%F0%9F%93%9D%20Go%20Report-A%2B-75C46B?style=flat-square" alt="Go Report Card">
+    </a>
+    <a href="https://codecov.io/gh/goflash/flash">
+        <img src="https://codecov.io/gh/goflash/flash/graph/badge.svg?token=VRHM48HJ5L" alt="Coverage">
+    </a>
+    <a href="https://github.com/goflash/flash/actions?query=workflow%3ATest">
+        <img src="https://img.shields.io/github/actions/workflow/status/goflash/flash/test-coverage.yml?branch=main&label=%F0%9F%A7%AA%20Tests&style=flat-square&color=75C46B" alt="Tests">
+    </a>
+    <img src="https://img.shields.io/badge/go-1.22%2B-00ADD8?logo=golang" alt="Go Version">
+    <a href="https://docs.goflash.dev">
+        <img src="https://img.shields.io/badge/%F0%9F%92%A1%20GoFlash-docs-00ACD7.svg?style=flat-square" alt="GoFlash Docs">
+    </a>
+    <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+    <br>
+    <br>
+    <div style="text-align:center">
+      <a href="https://discord.gg/QHhGHtjjQG">
+        <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/QHhGHtjjQG" alt="Discord">
+      </a>
+    </div>
+</div>
 
 ---
 
@@ -253,7 +268,7 @@ mux.Handle("/api/", http.StripPrefix("/api", app))
 log.Fatal(http.ListenAndServe(":8080", mux))
 ```
 
-> Interop 🔗: GoFlash is designed for zero-friction interop: no adapters, no wrappers, just standard Go interfaces. This makes it ideal for gradual adoption, microservices, and complex architectures.
+> GoFlash is designed for zero-friction interop: no adapters, no wrappers, just standard Go interfaces. This makes it ideal for gradual adoption, microservices, and complex architectures.
 
 ### Logging
 
@@ -329,7 +344,7 @@ We welcome issues and PRs! Please read [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 <small>
 
-**📝 License**: MIT | **🔄 Last Updated**: August 2025 | **📧 Support**: [Create an Issue]([../../issues](https://github.com/goflash/flash/issues))
+**📝 License**: MIT | **📧 Support**: [Create an Issue]([../../issues](https://github.com/goflash/flash/issues))
 
 Battle tested in private productions.
 <br/> Released with ❤️ for the Go community.
