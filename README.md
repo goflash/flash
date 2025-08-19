@@ -33,10 +33,10 @@
 
 <p align="center">
     <em>
-        <b>Flash</b> is a lean web framework inspired by Gin and Fiber. 
-        Built on the standard <code>net/http</code>,
+        <b>Flash</b> is a lean web framework inspired by Gin and Fiber, combining their best. 
+        Built on the standard <code>net/http</code>. 
         <br>
-        it prioritizes developer speed and runtime performance - with a tiny API, 
+        It prioritizes developer speed and runtime performance - with a <b>tiny, tested and stable API</b>, 
         clean ergonomics, and near‑zero allocations in hot paths.
         <br>
         Ship features fast without sacrificing reliability.
