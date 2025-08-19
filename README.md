@@ -29,67 +29,68 @@ import (
     "net/http"
 
     "github.com/goflash/flash/v2"
-    mw "github.com/goflash/flash/v2/middleware"
+    "github.com/goflash/flash/v2/middleware"
 )
 
 func main() {
     app := flash.New()
+    app.Use(middleware.Recover(), middleware.Logger())
 
-    app.Use(mw.Recover(), mw.Logger())
+    // Easiest endpoint
+    app.ANY("/ping", func(c flash.Ctx) error {
+        return c.String(http.StatusOK, "pong")
+    })
 
+    // Path param with JSON response
     app.GET("/hello/:name", func(c flash.Ctx) error {
         return c.JSON(map[string]any{"hello": c.Param("name")})
     })
+
+    // And many other possibilities without compromise on speed.
 
     log.Fatal(http.ListenAndServe(":8080", app))
 }
 ```
 
-> More examples 📁: Browse the runnable examples in [examples](./examples/).
+> More examples 📁: Browse runnable examples in the separate repo: [goflash/examples](https://github.com/goflash/examples)
 
 ---
 
-## Overview
+## Philosophy & Overview
 
-- 🎯 Purpose: Productive HTTP framework with a tiny, composable core and batteries-included middlewares.
-- 📐 Philosophy: Standard library first, high performance without gimmicks, small API surface.
-- 👥 Who is it for: Teams that need Gin-like safety and net/http compatibility with Fiber-like ergonomics.
-- 🧩 API: Clean, minimal, and ergonomic—`flash.New()`, `flash.Ctx`, and composable middleware.
-- 🔗 Interop & compatibility: 100% net/http, HTTP/2-ready; mount any `http.Handler`, and `App` is an `http.Handler`.
-- 🔌 Extensibility: Add your own middleware, plug in any logger (slog, zap, zerolog), and compose freely.
-- 🔭 Observability: Built-in OpenTelemetry tracing, structured logging, and request context helpers.
-- 🚀 Modern Go: Designed for Go 1.22+, leverages context, slog, and best practices for performance and safety.
-- 🛡️ Security: Safe defaults; optional CSRF, timeouts, rate limiting, and session hardening via middleware.
-- 🛠️ Support: Works with standard tooling (net/http, HTTP/2, pprof, Prometheus, OpenTelemetry).
-- 🚧 Stability: Alpha; small, explicit API. SemVer from v1.0; minor breaking changes possible until then.
-- 🧭 Scope: Minimal core by design; advanced patterns live in middleware and the examples catalog.
-
-> Note ✅: This README shows only minimal examples. For complete, runnable samples, see the examples directory: [examples](./examples/).
+- **🎯 Purpose:** Productive HTTP framework with a tiny, composable core and batteries-included middlewares.
+- **📐 Philosophy:** <u>Standard library first</u>, high performance without gimmicks, small API surface.
+- **👥 Who is it for:** Teams that need Gin-like safety and net/http compatibility with Fiber-like ergonomics.
+- **🧩 API:** Clean, minimal, and ergonomic—`flash.New()`, `flash.Ctx`, and composable middleware.
+- **🔗 Interop & compatibility:** 100% net/http, HTTP/2-ready; mount any `http.Handler`, and `App` is an `http.Handler`.
+- **🔌 Extensibility:** Add your own middleware, plug in any logger (slog, zap, zerolog), and compose freely.
+- **🚀 Modern Go:** Designed for Go 1.22+, leverages context, slog, and best practices for performance and safety.
+- **🛡️ Security:** Safe defaults; optional CSRF, timeouts, rate limiting,  session hardening via middleware and many more.
+- **🛠️ Support:** Works with standard tooling (net/http, HTTP/2, pprof, Prometheus, OpenTelemetry, etc).
+- **🧭 Scope:** Minimal core by design; advanced patterns live in middleware and the examples repository.
 
 ---
 
 ## Features
 
-| Feature                    | Description & Rationale                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.               |
-| **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.         |
-| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, typed `ParamInt/Bool/...`, `BindJSON`, `JSON`, `String`.   |
-| **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                   |
-| **Built-in middleware**    | Logger, Recover, CORS, Timeout, OpenTelemetry, Sessions, Gzip, Request ID, Rate Limit, Buffer.                   |
-| **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                   |
-| **Static files**           | Serve static assets with `App.Static` or multiple folders with `App.StaticDirs` (first match wins).              |
-| **Hooks & error handling** | Custom `OnError`, `NotFound`, and `MethodNA` for full control over error and 404/405 responses.                  |
-| **Mounting/Interop**       | Mount any `http.Handler` or ServeMux; easy migration and integration with legacy or third-party code.            |
-| **Pluggable logging**      | Use any slog-compatible logger (slog, zap, zerolog); logger is injected into request context.                    |
-| **Observability**          | Built-in OpenTelemetry tracing middleware for distributed tracing and metrics.                                   |
-| **Session management**     | In-memory sessions with cookie/header ID; extensible for custom stores.                                          |
-| **Performance**            | Pooled buffers, precomputed Content-Length, pooled gzip writers, and efficient write buffering.                  |
-| **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated. |
-| **Modern Go**              | Designed for Go 1.22+, leverages context, slog, and idiomatic error handling.                                    |
-| **Examples**               | Real-world, runnable examples for all features: cookies, templates, WebSockets, shutdown, and more.              |
-
-> Tip 💡: Every feature is included to maximize developer productivity, safety, and performance, while keeping the API minimal and explicit. No hidden magic, no global state, no surprises.
+| Feature                    | Description & Rationale                                                                                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.                                                                |
+| **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.                                                          |
+| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, typed `ParamInt/Bool/...`, `BindJSON`, `JSON`, `String`.                                                    |
+| **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                                                                    |
+| **Built-in middleware**    | Logger, Recover, CORS, Timeout, OpenTelemetry, Sessions, Gzip, Request ID, Rate Limit, Buffer.                                                                    |
+| **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                                                                    |
+| **Static files**           | Serve static assets with `App.Static` or multiple folders with `App.StaticDirs` (first match wins).                                                               |
+| **Hooks & error handling** | Custom `OnError`, `NotFound`, and `MethodNA` for full control over error and 404/405 responses.                                                                   |
+| **Mounting/Interop**       | Mount any `http.Handler` or ServeMux; easy migration and integration with legacy or third-party code.                                                             |
+| **Pluggable logging**      | Use any slog-compatible logger (slog, zap, zerolog); logger is injected into request context.                                                                     |
+| **Observability**          | Built-in OpenTelemetry tracing middleware for distributed tracing and metrics.                                                                                    |
+| **Session management**     | In-memory sessions with cookie/header ID; extensible for custom stores.                                                                                           |
+| **Performance**            | Pooled buffers, precomputed Content-Length, pooled gzip writers, and efficient write buffering.                                                                   |
+| **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated.                                                  |
+| **Modern Go**              | Designed for Go 1.22+, leverages context, slog, and idiomatic error handling.                                                                                     |
+| **Examples**               | Real-world, runnable examples for features like cookies, templates, WebSockets, shutdown, and more (see [goflash/examples](https://github.com/goflash/examples)). |
 
 ### Performance highlights
 
@@ -136,17 +137,13 @@ GoFlash is designed to combine the best of Gin and Fiber, while addressing their
 - **Extensible and future-proof:** Designed for microservices, monoliths, and serverless. Clean project structure, easy to add your own middleware, and ready for new Go features (e.g., generics, slog).
 - **Professional developer experience:** Clear docs, real-world examples, and a focus on explicitness and safety. No hidden magic, no global state, and no “gotchas” for teams scaling up.
 
-> Note 📎: GoFlash is for teams who want the speed and ergonomics of Fiber, the reliability and compatibility of Gin, and the flexibility to build anything from microservices to large-scale backends—without compromise.
-
 ---
 
 ## Install
 
 ```bash
-go get github.com/goflash/flash
+go get github.com/goflash/flash/v2
 ```
-
-If an example uses extra deps (e.g., [gorilla/websocket](https://github.com/gorilla/websocket), [OpenTelemetry](https://opentelemetry.io/)), run `go mod tidy` at repo root.
 
 ---
 
@@ -203,18 +200,7 @@ flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request
 
 #### Typed query and path parameters
 
-Avoid repetitive `strconv` calls with typed helpers that return a parsed value or a default:
-
-```go
-app.GET("/users/:id", func(c flash.Ctx) error {
-    id := c.ParamInt("id", 0)        // 0 if missing/invalid
-    active := c.QueryBool("active", false)
-    limit := c.QueryInt("limit", 20) // default to 20
-    return c.JSON(map[string]any{"id": id, "active": active, "limit": limit})
-})
-```
-
-> See a runnable example in examples/query_params.
+Avoid repetitive `strconv` calls with typed helpers that return a parsed value or a default.
 
 ### Mounting/Interop
 
@@ -248,16 +234,6 @@ app.HandleHTTP("GET", "/status", http.HandlerFunc(func(w http.ResponseWriter, r 
 }))
 ```
 
-> Static files 📦: Serve from one or more directories under a prefix. First existing file wins.
->
-> ```go
-> // Single directory
-> app.Static("/assets/", "./public")
->
-> // Multiple directories (e.g., override pub with build output)
-> app.StaticDirs("/assets/", "./public", "./dist")
-> ```
-
 #### Migration and Interop Patterns
 
 - **Incremental migration:** Start by mounting your existing `http.ServeMux` or legacy handlers, then gradually move routes to GoFlash for improved ergonomics and middleware support.
@@ -281,162 +257,7 @@ log.Fatal(http.ListenAndServe(":8080", mux))
 
 ### Logging
 
-- GoFlash uses Go's standard slog for framework logging.
-- Provide your own logger via `app.SetLogger(*slog.Logger)`.
-- Middlewares pull the logger from request context.
-
-```go
-logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-app.SetLogger(logger)
-app.Use(mw.Logger())
-```
-
-Adapters
-
-- You can plug zap/zerolog via slog-compatible handlers (community adapters), keeping the GoFlash API stable.
-
----
-
-## Built-in Middleware
-
-| Middleware                                     | Purpose                                                                 | Key Options                                                                                                              |
-| ---------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [Logger](middleware/logger.go)                 | Simple request logging                                                  | —                                                                                                                        |
-| [Recover](middleware/recover.go)               | Panic safety to 500                                                     | —                                                                                                                        |
-| [CORS](middleware/cors.go)                     | Cross-origin rules                                                      | `Origins`, `Methods`, `Headers`, `Credentials`                                                                           |
-| [Timeout](middleware/timeout.go)               | Per-route deadline                                                      | `Duration`, custom timeout handler                                                                                       |
-| [OpenTelemetry](middleware/otel.go)            | Server spans + attributes + status mapping                              | `Tracer`, `Propagator`, `Filter`, `SpanName`, `Attributes`, `Status`, `RecordDuration`, `ServiceName`, `ExtraAttributes` |
-| [Sessions](middleware/session.go)              | Cookie or header session ID, in-memory store                            | `TTL`, `CookieName`, `HeaderName`, etc.                                                                                  |
-| [Gzip](middleware/gzip.go)                     | Response compression with pooled writers                                | `Level`                                                                                                                  |
-| [Request ID](middleware/requestid.go)          | Ensure/echo request ID header and put into context                      | `Header` (default `X-Request-ID`)                                                                                        |
-| [Rate Limit](middleware/ratelimit.go)          | Token bucket per client IP                                              | `Limiter`, `Header` (Retry-After)                                                                                        |
-| [Buffer](middleware/buffer.go)                 | Pooled write buffer; sets Content-Length; auto-stream on large payloads | `InitialSize`, `MaxSize`                                                                                                 |
-| [CSRF](middleware/csrf.go)                     | Double-submit cookie CSRF protection (optional)                         | `CookieName`, `HeaderName`, `TokenLength`, `TTL`, etc.                                                                   |
-| [Validator I18n](middleware/validator_i18n.go) | Per-request localized validation messages                               | `DefaultLocale`, `LocaleFromCtx`, `MessageFuncFor` (required), `SetGlobal`                                               |
-
-### Usage
-
-```go
-// Enable CSRF protection (optional, for forms or APIs)
-app.Use(mw.CSRF())
-// Or with custom config:
-app.Use(mw.CSRF(mw.CSRFConfig{
-    CookieName: "_csrf", HeaderName: "X-CSRF-Token", TokenLength: 32,
-}))
-```
-
-```go
-// Provide custom slog logger
-logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-app.SetLogger(logger)
-
-// Enable structured logging
-app.Use(mw.Logger())
-```
-
-> Security ⚠️: CSRF is recommended for form posts or cookie-authenticated APIs.
-
----
-
-## Observability (OpenTelemetry)
-
-- Adds a span per request with attributes: method, route, target, status, peer info.
-- Propagates context for downstream services. Errors map to span status.
-
-### Example
-
-```go
-app := flash.New()
-// Quick start: service name and optional extra attributes
-app.Use(mw.OTel("my-service", attribute.String("env", "dev")))
-```
-
-> Advanced 📡: For full control (`Filter`, custom `SpanName`, extra attributes, custom `Status` mapping, duration recording), use `mw.OTelWithConfig(...)`. See the complete example in [examples/otel](./examples/otel).
-
-> Note 📝: Prefer setting `service.name` on the OpenTelemetry Resource when configuring your `TracerProvider`. The middleware `ServiceName` is a convenience for simple setups.
-
----
-
-## Validation
-
-Use [go-playground/validator](https://github.com/go-playground/validator) via the `validate` package. Error fields use JSON tag names.
-
-```go
-import (
-    "net/http"
-    "github.com/goflash/flash/v2/validate"
-)
-
-type Signup struct {
-    Email string `json:"email" validate:"required,email"`
-    Age   int    `json:"age" validate:"required,min=13"`
-}
-
-app.POST("/signup", func(c flash.Ctx) error {
-    var in Signup
-    if err := c.BindJSON(&in); err != nil {
-        return c.Status(http.StatusBadRequest).JSON(map[string]any{"error": "invalid json"})
-    }
-    if err := validate.Struct(in); err != nil {
-        return c.Status(http.StatusUnprocessableEntity).JSON(map[string]any{
-            "message": "validation failed",
-            "fields":  validate.ToFieldErrors(err),
-        })
-    }
-    return c.JSON(map[string]any{"ok": true})
-})
-```
-
-### Localized messages (i18n)
-
-Use the ValidatorI18n middleware to translate validation messages per request. By default it looks at the `:lang` route param if present.
-
-```go
-// Prepare translators and register validator translations once (setup not shown)
-// translators := map[string]ut.Translator{"en": enTr, "es": esTr}
-
-app.Use(middleware.ValidatorI18n(middleware.ValidatorI18nConfig{
-    DefaultLocale: "en",
-    MessageFuncFor: func(locale string) func(validator.FieldError) string {
-        tr := translators[locale]
-        if tr == nil { tr = translators["en"] }
-        return func(fe validator.FieldError) string { return fe.Translate(tr) }
-    },
-}))
-
-// With routes like /:lang/..., locale is taken from :lang by default
-app.POST(":lang/signup", func(c flash.Ctx) error {
-    var in Signup
-    if err := c.BindJSON(&in); err != nil {
-        return c.Status(400).JSON(map[string]any{"fields": validate.ToFieldErrors(err)})
-    }
-    if err := validate.Struct(in); err != nil {
-        return c.Status(422).JSON(map[string]any{
-            // Uses request-scoped translator set by middleware
-            "fields": validate.ToFieldErrorsWithContext(c.Context(), err),
-        })
-    }
-    return c.JSON(map[string]any{"ok": true})
-})
-```
-
-> See the full i18n example in [examples/validation_with_i18n](./examples/validation_with_i18n).
-
----
-
-## Sessions
-
-- In-memory store with cookie or header-based session IDs.
-- Per-request `Session` via `mw.SessionFromCtx(c)` with `Get/Set/Delete`.
-
-```go
-app.Use(mw.Sessions(mw.SessionConfig{ TTL: 24*time.Hour }))
-app.GET("/me", func(c flash.Ctx) error {
-    s := mw.SessionFromCtx(c)
-    s.Set("user", "u1")
-    return c.JSON(map[string]any{"user": "u1"})
-})
-```
+GoFlash uses Go's standard slog for framework logging and supports pluggable handlers. See the examples repository for end-to-end logging setups.
 
 ---
 
@@ -448,25 +269,18 @@ app.GET("/me", func(c flash.Ctx) error {
 - Buffer middleware reduces syscalls by buffering responses and auto-switches to streaming when exceeding `MaxSize`.
 - Request ID is available on the request context for low-overhead correlation in logs.
 
-> Tip ⚡️: For APIs with small/medium payloads, combining `Buffer`, `Gzip`, and precomputed `Content-Length` yields excellent performance with low GC pressure.
+> For APIs with small/medium payloads, combining `Buffer`, `Gzip`, and precomputed `Content-Length` yields excellent performance with low GC pressure.
 
 ---
 
-## All Examples
+## Examples
 
-Run any example:
+All runnable examples live in a separate repository:
 
-```bash
-# Root-managed examples
-go run ./examples/basic
+- Repository: [goflash/examples](https://github.com/goflash/examples)
+- Explore topics like cookies, sessions, CSRF, templates, WebSockets, graceful shutdown, OpenTelemetry, and more.
 
-# Examples with their own go.mod (run from the folder)
-cd examples/otel && go run .
-cd examples/custom_logger_zap && go run .
-cd examples/websocket && go run .
-```
-
-> Explore more in examples: cookies, sessions, CSRF, templates, WebSockets, graceful shutdown, groups, and more. See [examples](./examples/).
+To run an example, clone that repo and run it from its folder (many are standalone `go run .`).
 
 ---
 
