@@ -1,10 +1,10 @@
-<div style="text-align: center">
+<h1 align="center">
 <img src="./public/images/logo-wide.png" alt="GoFlash Logo" width="600" />
 
 **A fast, minimal, modular HTTP framework for Go, built on net/http. Ergonomics you love from Fiber, reliability and compatibility you expect from Gin.**
-</div>
+</h1>
 
-<div style="text-align:center">
+<p align="center">
     <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.4">
         <img src="https://pkg.go.dev/badge/github.com/goflash/flash.svg" alt="Go Reference">
     </a>
@@ -24,13 +24,12 @@
     <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
     <br>
-    <br>
     <div style="text-align:center">
       <a href="https://discord.gg/QHhGHtjjQG">
         <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/QHhGHtjjQG" alt="Discord">
       </a>
     </div>
-</div>
+</p>
 
 ---
 
