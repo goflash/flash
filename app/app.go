@@ -54,8 +54,8 @@ func New() App {
 	// Set up default handlers and logger
 	app.router.HandleMethodNotAllowed = true
 	app.SetErrorHandler(defaultErrorHandler)
-	app.SetNotFound(http.NotFoundHandler())
-	app.SetMethodNotAllowed(methodNotAllowedHandler())
+	app.SetNotFoundHandler(http.NotFoundHandler())
+	app.SetMethodNotAllowedHandler(methodNotAllowedHandler())
 	app.SetLogger(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	app.router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,9 +95,9 @@ func (a *DefaultApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Configuration setters to satisfy interface
-func (a *DefaultApp) SetErrorHandler(h ErrorHandler) { a.OnError = h }
-func (a *DefaultApp) SetNotFound(h http.Handler)     { a.NotFound = h }
-func (a *DefaultApp) SetMethodNotAllowed(h http.Handler) {
+func (a *DefaultApp) SetErrorHandler(h ErrorHandler)    { a.OnError = h }
+func (a *DefaultApp) SetNotFoundHandler(h http.Handler) { a.NotFound = h }
+func (a *DefaultApp) SetMethodNotAllowedHandler(h http.Handler) {
 	a.MethodNA = h
 }
 
