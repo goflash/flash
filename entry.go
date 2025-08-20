@@ -25,6 +25,10 @@ type Middleware = app.Middleware
 // ErrorHandler handles errors returned from handlers. Re-exported from app.ErrorHandler.
 type ErrorHandler = app.ErrorHandler
 
+// HealthCheckFunc is a function that performs health checks and returns an error if unhealthy.
+// Re-exported from app.HealthCheckFunc.
+type HealthCheckFunc = app.HealthCheckFunc
+
 // Ctx is the request context interface, re-exported for convenience.
 type Ctx = ctx.Ctx
 

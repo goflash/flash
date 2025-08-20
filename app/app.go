@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/goflash/flash/v2/ctx"
 	"github.com/julienschmidt/httprouter"
@@ -41,6 +42,8 @@ type DefaultApp struct {
 	NotFound   http.Handler       // handler for 404 Not Found
 	MethodNA   http.Handler       // handler for 405 Method Not Allowed
 	logger     *slog.Logger       // application logger
+	healthPath string             // health check endpoint path
+	healthFunc HealthCheckFunc    // custom health check function
 }
 
 // New creates a new DefaultApp with sensible defaults and returns it as the App interface.
@@ -99,6 +102,46 @@ func (a *DefaultApp) SetErrorHandler(h ErrorHandler)    { a.OnError = h }
 func (a *DefaultApp) SetNotFoundHandler(h http.Handler) { a.NotFound = h }
 func (a *DefaultApp) SetMethodNotAllowedHandler(h http.Handler) {
 	a.MethodNA = h
+}
+
+// Health check functionality
+func (a *DefaultApp) EnableHealthCheck(path string) {
+	// If there's already a health check path, we need to remove the old route
+	// Since httprouter doesn't have a direct "remove route" method,
+	// we'll just update the path and the new route will override the old one
+	a.healthPath = path
+	a.GET(path, a.defaultHealthCheckHandler)
+}
+
+func (a *DefaultApp) SetHealthCheck(fn HealthCheckFunc) {
+	a.healthFunc = fn
+}
+
+func (a *DefaultApp) HealthCheckPath() string {
+	return a.healthPath
+}
+
+// defaultHealthCheckHandler is the default health check handler
+func (a *DefaultApp) defaultHealthCheckHandler(c Ctx) error {
+	status := "healthy"
+	httpStatus := http.StatusOK
+
+	// If a custom health check function is provided, use it
+	if a.healthFunc != nil {
+		if err := a.healthFunc(); err != nil {
+			status = "unhealthy"
+			httpStatus = http.StatusServiceUnavailable
+			a.Logger().Error("health check failed", "error", err)
+		}
+	}
+
+	response := map[string]interface{}{
+		"status":    status,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"service":   "goflash",
+	}
+
+	return c.Status(httpStatus).JSON(response)
 }
 
 // Getters to satisfy App interface without exposing fields when used as interface.
