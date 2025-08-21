@@ -790,3 +790,269 @@ func TestTypedHelpers_DefaultAndNoDefaultFallbacks(t *testing.T) {
 	assert.Equal(t, uint(9), c.QueryUint("missingQu", 9))
 	assert.Equal(t, uint(0), c.QueryUint("missingQu"))
 }
+
+// Convenience Methods Tests
+
+func TestRedirect(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.Redirect(http.StatusMovedPermanently, "/new-location"))
+	assert.Equal(t, http.StatusMovedPermanently, rec.Code)
+	assert.Equal(t, "/new-location", rec.Header().Get("Location"))
+	assert.True(t, c.WroteHeader())
+}
+
+func TestRedirectPermanent(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.RedirectPermanent("/permanent"))
+	assert.Equal(t, http.StatusMovedPermanently, rec.Code)
+	assert.Equal(t, "/permanent", rec.Header().Get("Location"))
+}
+
+func TestRedirectTemporary(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.RedirectTemporary("/temporary"))
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/temporary", rec.Header().Get("Location"))
+}
+
+func TestFile(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Test with non-existent file
+	err := c.File("non-existent-file.txt")
+	assert.Error(t, err)
+	assert.False(t, c.WroteHeader())
+}
+
+func TestFileFromFS(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	fs := http.Dir(".")
+
+	// Test with non-existent file
+	err := c.FileFromFS("non-existent-file.txt", fs)
+	assert.Error(t, err)
+	assert.False(t, c.WroteHeader())
+}
+
+func TestNotFound(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.NotFound())
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "Not Found", rec.Body.String())
+	assert.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
+}
+
+func TestNotFoundWithMessage(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.NotFound("Custom not found message"))
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "Custom not found message", rec.Body.String())
+}
+
+func TestInternalServerError(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.InternalServerError())
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Equal(t, "Internal Server Error", rec.Body.String())
+}
+
+func TestInternalServerErrorWithMessage(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.InternalServerError("Database connection failed"))
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Equal(t, "Database connection failed", rec.Body.String())
+}
+
+func TestBadRequest(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.BadRequest())
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "Bad Request", rec.Body.String())
+}
+
+func TestBadRequestWithMessage(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.BadRequest("Invalid JSON format"))
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "Invalid JSON format", rec.Body.String())
+}
+
+func TestUnauthorized(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.Unauthorized())
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Equal(t, "Unauthorized", rec.Body.String())
+}
+
+func TestUnauthorizedWithMessage(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.Unauthorized("Invalid credentials"))
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Equal(t, "Invalid credentials", rec.Body.String())
+}
+
+func TestForbidden(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.Forbidden())
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, "Forbidden", rec.Body.String())
+}
+
+func TestForbiddenWithMessage(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.Forbidden("Insufficient permissions"))
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, "Insufficient permissions", rec.Body.String())
+}
+
+func TestNoContent(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	require.NoError(t, c.NoContent())
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Equal(t, "", rec.Body.String())
+	assert.True(t, c.WroteHeader())
+}
+
+func TestStream(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	content := "streamed content"
+	reader := strings.NewReader(content)
+
+	require.NoError(t, c.Stream(http.StatusOK, "text/plain", reader))
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, content, rec.Body.String())
+	assert.Equal(t, "text/plain", rec.Header().Get("Content-Type"))
+	assert.Equal(t, len(content), c.wroteBytes)
+}
+
+func TestStreamJSON(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	data := map[string]string{"message": "hello"}
+
+	require.NoError(t, c.StreamJSON(http.StatusCreated, data))
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Equal(t, "application/json; charset=utf-8", rec.Header().Get("Content-Type"))
+	assert.Equal(t, `{"message":"hello"}`, rec.Body.String())
+}
+
+func TestSetCookie(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	cookie := &http.Cookie{
+		Name:  "session",
+		Value: "abc123",
+		Path:  "/",
+	}
+	c.SetCookie(cookie)
+
+	cookies := rec.Header().Values("Set-Cookie")
+	assert.Len(t, cookies, 1)
+	assert.Contains(t, cookies[0], "session=abc123")
+}
+
+func TestGetCookie(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Cookie", "session=abc123; user=john")
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	cookie, err := c.GetCookie("session")
+	require.NoError(t, err)
+	assert.Equal(t, "session", cookie.Name)
+	assert.Equal(t, "abc123", cookie.Value)
+}
+
+func TestGetCookieNotFound(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	_, err := c.GetCookie("nonexistent")
+	assert.Error(t, err)
+}
+
+func TestClearCookie(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	c.ClearCookie("session")
+
+	cookies := rec.Header().Values("Set-Cookie")
+	assert.Len(t, cookies, 1)
+	assert.Contains(t, cookies[0], "session=")
+	assert.Contains(t, cookies[0], "Max-Age=0")
+	assert.Contains(t, cookies[0], "HttpOnly")
+}
+
+func TestConvenienceMethodsChaining(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Test that convenience methods work with status chaining
+	c.Status(http.StatusOK).Header("X-Custom", "value")
+	require.NoError(t, c.NotFound("Custom message"))
+
+	// Status should be overridden by NotFound
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "Custom message", rec.Body.String())
+	assert.Equal(t, "value", rec.Header().Get("X-Custom"))
+}
+
+// Helper functions for testing
