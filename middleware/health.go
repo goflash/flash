@@ -87,34 +87,6 @@ func healthCheckHandler(cfg HealthCheckConfig) flash.Handler {
 	}
 }
 
-// HealthCheck returns middleware that adds a health check endpoint.
-// The middleware registers a GET route at the specified path that returns
-// a JSON response indicating the health status of the service.
-// Note: This middleware only works if a route is already registered at the health check path.
-// For automatic route registration, use RegisterHealthCheck instead.
-func HealthCheck(cfg HealthCheckConfig) flash.Middleware {
-	// Set defaults
-	if cfg.Path == "" {
-		cfg.Path = "/health"
-	}
-	if cfg.ServiceName == "" {
-		cfg.ServiceName = "goflash"
-	}
-
-	// Create the health check handler
-	handler := healthCheckHandler(cfg)
-
-	return func(next flash.Handler) flash.Handler {
-		return func(c flash.Ctx) error {
-			// Only handle requests to the health check path
-			if c.Path() == cfg.Path {
-				return handler(c)
-			}
-			return next(c)
-		}
-	}
-}
-
 // RegisterHealthCheck registers a health check endpoint on the given app.
 // This is the recommended way to add health checks as it automatically registers the route.
 func RegisterHealthCheck(app flash.App, cfg HealthCheckConfig) {
@@ -130,12 +102,12 @@ func RegisterHealthCheck(app flash.App, cfg HealthCheckConfig) {
 	app.GET(cfg.Path, healthCheckHandler(cfg))
 }
 
-// HealthCheckWithPath is a convenience function that creates a health check middleware
+// HealthCheckWithPath is a convenience function that creates a health check configuration
 // with just a path and optional health check function.
-func HealthCheckWithPath(path string, fn ...HealthCheckFunc) flash.Middleware {
+func HealthCheckWithPath(path string, fn ...HealthCheckFunc) HealthCheckConfig {
 	cfg := HealthCheckConfig{Path: path}
 	if len(fn) > 0 {
 		cfg.HealthCheckFunc = fn[0]
 	}
-	return HealthCheck(cfg)
+	return cfg
 }
