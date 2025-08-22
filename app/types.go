@@ -5,10 +5,6 @@ import (
 	"net/http"
 )
 
-// HealthCheckFunc is a function that performs health checks and returns an error if unhealthy.
-// If the function returns nil, the service is considered healthy.
-type HealthCheckFunc func() error
-
 // App defines the public surface of the router/app, suitable for mocking.
 // Implemented by *DefaultApp.
 type App interface {
@@ -34,7 +30,7 @@ type App interface {
 	StaticDirs(prefix string, dirs ...string)
 
 	// Grouping
-	Group(prefix string, mw ...Middleware) *Group
+	Group(prefix string, mws ...Middleware) *Group
 
 	// Logging
 	SetLogger(l *slog.Logger)
@@ -44,11 +40,6 @@ type App interface {
 	SetErrorHandler(h ErrorHandler)
 	SetNotFoundHandler(h http.Handler)
 	SetMethodNotAllowedHandler(h http.Handler)
-
-	// Health check functionality
-	EnableHealthCheck(path string)
-	SetHealthCheck(fn HealthCheckFunc)
-	HealthCheckPath() string
 
 	// Getters for handlers (mirrors Set*). Useful when holding App as an interface.
 	ErrorHandler() ErrorHandler
