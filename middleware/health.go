@@ -105,7 +105,7 @@ func RegisterHealthCheck(app flash.App, cfg HealthCheckConfig) {
 // HealthCheckWithPath is a convenience function that creates a health check configuration
 // with just a path and optional health check function.
 func HealthCheckWithPath(path string, fn ...HealthCheckFunc) HealthCheckConfig {
-	cfg := HealthCheckConfig{Path: path}
+	cfg := HealthCheckConfig{Path: path, ServiceName: "goflash"}
 	if len(fn) > 0 {
 		cfg.HealthCheckFunc = fn[0]
 	}

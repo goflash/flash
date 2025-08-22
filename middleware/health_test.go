@@ -130,6 +130,54 @@ func TestHealthCheckWithPath(t *testing.T) {
 	}
 }
 
+func TestHealthCheckWithPathHelper(t *testing.T) {
+	// Test the HealthCheckWithPath helper function
+	cfg := HealthCheckWithPath("/test")
+	assert.Equal(t, "/test", cfg.Path)
+	assert.Equal(t, "goflash", cfg.ServiceName)
+	assert.Nil(t, cfg.HealthCheckFunc)
+
+	// Test with function
+	testFunc := func() error { return nil }
+	cfg = HealthCheckWithPath("/test", testFunc)
+	assert.Equal(t, "/test", cfg.Path)
+	assert.NotNil(t, cfg.HealthCheckFunc)
+}
+
+func TestHealthCheckConfigDefaults(t *testing.T) {
+	// Test that defaults are properly set
+	app := flash.New()
+	RegisterHealthCheck(app, HealthCheckConfig{}) // Empty config
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+
+	app.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, `"service":"goflash"`)
+	assert.Contains(t, body, `"status":"healthy"`)
+}
+
+func TestHealthCheckConfigCustomDefaults(t *testing.T) {
+	// Test custom defaults
+	app := flash.New()
+	RegisterHealthCheck(app, HealthCheckConfig{
+		ServiceName: "custom-service",
+	}) // Only service name set
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+
+	app.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, `"service":"custom-service"`)
+	assert.Contains(t, body, `"status":"healthy"`)
+}
+
 func TestHealthCheckErrorHandling(t *testing.T) {
 	var errorCalled bool
 	var successCalled bool
