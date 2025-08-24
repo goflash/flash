@@ -9,10 +9,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/julienschmidt/httprouter"
+	router "github.com/julienschmidt/httprouter"
 )
-
-// newMSDecoder moved to bind_json.go
 
 // Ctx is the interface exposed to handlers and middleware.
 // Implemented by *DefaultContext. Located in package ctx to avoid adapters and cycles.
@@ -57,6 +55,22 @@ type Ctx interface {
 	// BindJSON decodes request body JSON into v with strict defaults; see BindJSONOptions.
 	BindJSON(v any, opts ...BindJSONOptions) error
 
+	// BindMap binds from a generic map (e.g., collected from body/query/path) into v using mapstructure.
+	// Options mirror BindJSONOptions.
+	BindMap(v any, m map[string]any, opts ...BindJSONOptions) error
+
+	// BindForm collects form body fields and binds them into v (application/x-www-form-urlencoded or multipart/form-data).
+	BindForm(v any, opts ...BindJSONOptions) error
+
+	// BindQuery collects query string parameters and binds them into v.
+	BindQuery(v any, opts ...BindJSONOptions) error
+
+	// BindPath collects path parameters and binds them into v.
+	BindPath(v any, opts ...BindJSONOptions) error
+
+	// BindAny collects from path, body (json/form), and query according to priority and binds them into v.
+	BindAny(v any, opts ...BindJSONOptions) error
+
 	// Utilities
 	Get(key any, def ...any) any
 	Set(key, value any) Ctx
@@ -71,7 +85,7 @@ type Ctx interface {
 type DefaultContext struct {
 	w           http.ResponseWriter // underlying response writer
 	r           *http.Request       // underlying request
-	params      httprouter.Params   // route parameters
+	params      router.Params       // route parameters
 	status      int                 // status code to write
 	wroteHeader bool                // whether header was written
 	wroteBytes  int                 // number of bytes written
@@ -80,7 +94,7 @@ type DefaultContext struct {
 }
 
 // Reset prepares the context for a new request. Used internally by the framework.
-func (c *DefaultContext) Reset(w http.ResponseWriter, r *http.Request, ps httprouter.Params, route string) {
+func (c *DefaultContext) Reset(w http.ResponseWriter, r *http.Request, ps router.Params, route string) {
 	c.w = w
 	c.r = r
 	c.params = ps
@@ -149,7 +163,7 @@ func (c *DefaultContext) Path() string { return c.r.URL.Path }
 func (c *DefaultContext) Route() string { return c.route }
 
 // Param returns a path parameter by name. Returns "" if not found.
-// Note: httprouter.Params.ByName returns "" if not found, so this avoids extra allocation.
+// Note: router.Params.ByName returns "" if not found, so this avoids extra allocation.
 func (c *DefaultContext) Param(name string) string { return c.params.ByName(name) }
 
 // Query returns a query string parameter by key. Returns "" if not found.
@@ -421,8 +435,6 @@ func (c *DefaultContext) Send(status int, contentType string, b []byte) (int, er
 	c.wroteBytes += n
 	return n, err
 }
-
-// BindJSON moved to bind_json.go
 
 // Clone returns a shallow copy of the context. Safe for use across goroutines
 // as long as ResponseWriter is swapped to a concurrency-safe writer when needed.

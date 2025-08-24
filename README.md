@@ -99,23 +99,23 @@ func main() {
 
 ## Features
 
-| Feature                    | Description & Rationale                                                                                                                                           |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.                                                                |
-| **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.                                                          |
-| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, typed `ParamInt/Bool/...`, `BindJSON`, `JSON`, `String`.                                                    |
-| **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                                                                    |
-| **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                                                                    |
-| **Static files**           | Serve static assets with `App.Static` or multiple folders with `App.StaticDirs` (first match wins).                                                               |
-| **Hooks & error handling** | Custom `OnError`, `NotFound`, and `MethodNA` for full control over error and 404/405 responses.                                                                   |
-| **Mounting/Interop**       | Mount any `http.Handler` or ServeMux; easy migration and integration with legacy or third-party code.                                                             |
-| **Pluggable logging**      | Use any slog-compatible logger (slog, zap, zerolog); logger is injected into request context.                                                                     |
-| **Observability**          | OpenTelemetry tracing and metrics via external module: goflash/otel.                                                                                              |
-| **Session management**     | In-memory sessions with cookie/header ID; extensible for custom stores.                                                                                           |
-| **Performance**            | Pooled buffers, precomputed Content-Length, pooled gzip writers, and efficient write buffering.                                                                   |
-| **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated.                                                  |
-| **Modern Go**              | Designed for Go 1.23+, leverages context, slog, and idiomatic error handling.                                                                                     |
-| **Examples**               | Real-world, runnable examples for features like cookies, templates, WebSockets, shutdown, and more (see [goflash/examples](https://github.com/goflash/examples)). |
+| Feature                    | Description & Rationale                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **net/http compatible**    | `App` implements `http.Handler` for seamless integration with Go’s ecosystem and HTTP/2 readiness.                                                                               |
+| **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.                                                                         |
+| **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, typed `ParamInt/Bool/...`, binding helpers (`BindJSON`, `BindForm`, `BindQuery`, `BindPath`, `BindAny`), `JSON`, `String`. |
+| **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                                                                                   |
+| **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                                                                                   |
+| **Static files**           | Serve static assets with `App.Static` or multiple folders with `App.StaticDirs` (first match wins).                                                                              |
+| **Hooks & error handling** | Custom `OnError`, `NotFound`, and `MethodNA` for full control over error and 404/405 responses.                                                                                  |
+| **Mounting/Interop**       | Mount any `http.Handler` or ServeMux; easy migration and integration with legacy or third-party code.                                                                            |
+| **Pluggable logging**      | Use any slog-compatible logger (slog, zap, zerolog); logger is injected into request context.                                                                                    |
+| **Observability**          | OpenTelemetry tracing and metrics via external module: goflash/otel.                                                                                                             |
+| **Session management**     | In-memory sessions with cookie/header ID; extensible for custom stores.                                                                                                          |
+| **Performance**            | Pooled buffers, precomputed Content-Length, pooled gzip writers, and efficient write buffering.                                                                                  |
+| **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated.                                                                 |
+| **Modern Go**              | Designed for Go 1.23+, leverages context, slog, and idiomatic error handling.                                                                                                    |
+| **Examples**               | Real-world, runnable examples for features like cookies, templates, WebSockets, shutdown, and more (see [goflash/examples](https://github.com/goflash/examples)).                |
 
 ---
 
@@ -223,7 +223,12 @@ flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request
 | `JSON(v)`                                     | Writes a value as JSON, sets Content-Type/Length, and status (uses pooled buffer for performance). |
 | `String(status, body)`                        | Writes a plain text response with status and body.                                                 |
 | `Send(status, type, []byte)`                  | Writes raw bytes with status and content type.                                                     |
-| `BindJSON(&v)`                                | Strictly decodes request body JSON into v (unknown fields rejected, closes body).                  |
+| `BindJSON(&v, [opts])`                        | Decode JSON request body into v. Strict by default; see Binding section for options.               |
+| `BindForm(&v, [opts])`                        | Collect x-www-form-urlencoded or multipart form fields and bind into v.                            |
+| `BindQuery(&v, [opts])`                       | Collect query string parameters and bind into v.                                                   |
+| `BindPath(&v, [opts])`                        | Collect route path parameters and bind into v.                                                     |
+| `BindAny(&v, [opts])`                         | Merge Path > Body(JSON > Form) > Query and bind into v (highest precedence wins).                  |
+| `BindMap(&v, m, [opts])`                      | Bind from a provided map[string]any using `json` tags.                                             |
 | `Finish()`                                    | Finalizes the context (reserved for future buffer reuse, currently a no-op).                       |
 | `Reset(w, r, ps, route)`                      | Internal: resets the context for pooling (not for user code).                                      |
 
@@ -232,6 +237,49 @@ flash.Ctx is a thin, pooled wrapper around http.ResponseWriter and *http.Request
 #### Typed query and path parameters
 
 Avoid repetitive `strconv` calls with typed helpers that return a parsed value or a default.
+
+### Binding helpers
+
+Bind request data into structs or maps with explicit helpers. All binders use `json` struct tags for field names.
+
+- Strict by default: unknown fields are rejected for struct targets; type coercion is off.
+- Options: `BindJSONOptions{ WeaklyTypedInput bool, ErrorUnused bool }`.
+- Precedence in `BindAny`: Path > Body (JSON overrides Form) > Query.
+- Supported bodies: JSON, `application/x-www-form-urlencoded`, `multipart/form-data` (text values only; file uploads stay in `r.MultipartForm.File`).
+
+Example:
+
+```go
+type CreateUser struct {
+    ID    int    `json:"id"`
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+app.POST("/users/:id", func(c flash.Ctx) error {
+    var in CreateUser
+    // Merge from path, body, and query with predictable precedence
+    if err := c.BindAny(&in); err != nil {
+        // err may be ctx.FieldErrors with per-field messages
+        return c.Status(http.StatusBadRequest).JSON(map[string]any{"error": err.Error()})
+    }
+    // ... use in ...
+    return c.JSON(in)
+})
+```
+
+Looser coercion example (e.g., allow "10" -> 10):
+
+```go
+if err := c.BindJSON(&in, ctx.BindJSONOptions{WeaklyTypedInput: true}); err != nil { /* ... */ }
+```
+
+Advanced: bind from a custom map source:
+
+```go
+m := map[string]any{"id": "42", "name": "Ada"}
+if err := c.BindMap(&in, m); err != nil { /* ... */ }
+```
 
 ### Mounting/Interop
 
