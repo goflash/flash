@@ -5,7 +5,7 @@
         </picture>
     </a>
     <br />
-    <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.4">
+    <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.5">
         <img src="https://pkg.go.dev/badge/github.com/goflash/flash.svg" alt="Go Reference">
     </a>
     <a href="https://goreportcard.com/report/github.com/goflash/flash">
@@ -17,7 +17,7 @@
     <a href="https://github.com/goflash/flash/actions?query=workflow%3ATest">
         <img src="https://img.shields.io/github/actions/workflow/status/goflash/flash/test-coverage.yml?branch=main&label=%F0%9F%A7%AA%20Tests&style=flat-square&color=75C46B" alt="Tests">
     </a>
-    <img src="https://img.shields.io/badge/go-1.22%2B-00ADD8?logo=golang" alt="Go Version">
+    <img src="https://img.shields.io/badge/go-1.23%2B-00ADD8?logo=golang" alt="Go Version">
     <a href="https://docs.goflash.dev">
         <img src="https://img.shields.io/badge/%F0%9F%92%A1%20GoFlash-docs-00ACD7.svg?style=flat-square" alt="GoFlash Docs">
     </a>
@@ -33,17 +33,15 @@
 
 <p align="center">
     <em>
-        <b>Flash</b> is a lean web framework inspired by Gin and Fiber, combining their best. 
-        Built on the standard <code>net/http</code>. 
+        <b>Flash</b> is a lean web framework inspired by Gin and Fiber, combining their best.
+        Built on the standard <code>net/http</code>.
         <br>
-        It prioritizes developer speed and runtime performance - with a <b>tiny, tested and stable API</b>, 
+        It prioritizes developer speed and runtime performance - with a <b>tiny, tested and stable API</b>,
         clean ergonomics, and near‑zero allocations in hot paths.
         <br>
         Ship features fast without sacrificing reliability.
     </em>
 </p>
-
-
 
 ---
 
@@ -92,9 +90,9 @@ func main() {
 - **🧩 API:** Clean, minimal, and ergonomic—`flash.New()`, `flash.Ctx`, and composable middleware.
 - **🔗 Interop & compatibility:** 100% net/http, HTTP/2-ready; mount any `http.Handler`, and `App` is an `http.Handler`.
 - **🔌 Extensibility:** Add your own middleware, plug in any logger (slog, zap, zerolog), and compose freely.
-- **🚀 Modern Go:** Designed for Go 1.22+, leverages context, slog, and best practices for performance and safety.
+- **🚀 Modern Go:** Designed for Go 1.23+, leverages context, slog, and best practices for performance and safety.
 - **🛡️ Security:** Safe defaults; optional CSRF, timeouts, rate limiting,  session hardening via middleware and many more.
-- **🛠️ Support:** Works with standard tooling (net/http, HTTP/2, pprof, Prometheus, OpenTelemetry, etc).
+- **🛠️ Support:** Works with standard tooling (net/http, HTTP/2, pprof).
 - **🧭 Scope:** Minimal core by design; advanced patterns live in middleware and the examples repository.
 
 ---
@@ -107,18 +105,47 @@ func main() {
 | **Fast routing**           | High-performance router (httprouter): supports all HTTP verbs, route groups, and middleware composition.                                                          |
 | **Ergonomic context**      | `flash.Ctx` provides clean helpers: `Param`, `Query`, typed `ParamInt/Bool/...`, `BindJSON`, `JSON`, `String`.                                                    |
 | **Composable middleware**  | Global and per-route middleware, inspired by Gin/Fiber, for logging, recovery, CORS, and more.                                                                    |
-| **Built-in middleware**    | Logger, Recover, CORS, Timeout, OpenTelemetry, Sessions, Gzip, Request ID, Rate Limit, Buffer.                                                                    |
 | **Validation helpers**     | Integrated with go-playground/validator for robust request validation and field error mapping.                                                                    |
 | **Static files**           | Serve static assets with `App.Static` or multiple folders with `App.StaticDirs` (first match wins).                                                               |
 | **Hooks & error handling** | Custom `OnError`, `NotFound`, and `MethodNA` for full control over error and 404/405 responses.                                                                   |
 | **Mounting/Interop**       | Mount any `http.Handler` or ServeMux; easy migration and integration with legacy or third-party code.                                                             |
 | **Pluggable logging**      | Use any slog-compatible logger (slog, zap, zerolog); logger is injected into request context.                                                                     |
-| **Observability**          | Built-in OpenTelemetry tracing middleware for distributed tracing and metrics.                                                                                    |
+| **Observability**          | OpenTelemetry tracing and metrics via external module: goflash/otel.                                                                                              |
 | **Session management**     | In-memory sessions with cookie/header ID; extensible for custom stores.                                                                                           |
 | **Performance**            | Pooled buffers, precomputed Content-Length, pooled gzip writers, and efficient write buffering.                                                                   |
 | **Extensible**             | Add your own middleware, context helpers, or validation logic; batteries-included but not batteries-opinionated.                                                  |
-| **Modern Go**              | Designed for Go 1.22+, leverages context, slog, and idiomatic error handling.                                                                                     |
+| **Modern Go**              | Designed for Go 1.23+, leverages context, slog, and idiomatic error handling.                                                                                     |
 | **Examples**               | Real-world, runnable examples for features like cookies, templates, WebSockets, shutdown, and more (see [goflash/examples](https://github.com/goflash/examples)). |
+
+---
+
+## Middlewares
+
+Flash ships with a small set of core middlewares plus external ones.
+
+### Core (internal) middlewares
+
+These are part of the core because they are very lightweight and have no external dependencies.
+
+| Middleware | Purpose                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| Logger     | Structured request logs (slog); method, path, status, duration; correlates with Request ID when present. |
+| Recover    | Panic safety; returns 500 instead of crashing the server.                                                |
+| CORS       | Cross-origin headers and preflight handling.                                                             |
+| Timeout    | Per-request deadline with safe 504 fallback and optional callbacks.                                      |
+| Sessions   | In-memory session store with cookie/header ID; pluggable store interface.                                |
+| Gzip       | Response compression with pooled writers and zero-copy headers.                                          |
+| Request ID | Adds X-Request-ID and exposes it in request context.                                                     |
+| Rate Limit | Simple IP-based token-bucket limiter; customizable limiter interface.                                    |
+| Buffer     | Pooled response buffer to reduce syscalls and set Content-Length.                                        |
+| CSRF       | Double-submit cookie protection for unsafe methods.                                                      |
+
+### External middlewares
+
+| Middleware    | Description                                                                                                                                                                                                                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenTelemetry | Tracing and metrics integration for GoFlash: [goflash/otel](https://github.com/goflash/otel). Examples are in the [examples folder](https://github.com/goflash/otel/tree/main/examples).                                                                                                                               |
+| Validator     | Request validation middleware for GoFlash: [goflash/validator](https://github.com/goflash/validator) (powered by [go-playground/validator](https://github.com/go-playground/validator)); includes per-request i18n translators. Examples: [goflash/validator/examples](https://github.com/goflash/validator/examples). |
 
 ### Performance highlights
 
@@ -131,37 +158,13 @@ func main() {
 - Fast middleware chain: zero reflection, no global state, and no hidden allocations.
 - All features are opt-in: no performance penalty for unused middleware or helpers.
 
----
-
-## Why `GoFlash` vs Gin/Fiber/Others
-
-GoFlash is designed to combine the best of Gin and Fiber, while addressing their key limitations for modern, professional Go development:
-
-| Capability                  | Gin           | Fiber                 | GoFlash                               |
-| --------------------------- | ------------- | --------------------- | ------------------------------------- |
-| net/http compatible         | ✅ Yes         | ❌ No (fasthttp)       | ✅ Yes                                 |
-| HTTP/2 readiness            | ✅ Yes         | ❌ No (adapter needed) | ✅ Yes                                 |
-| Fast routing                | ✅ Yes         | ✅ Yes                 | ✅ Yes (httprouter)                    |
-| Friendly context helpers    | ✅ Yes         | ✅ Yes                 | ✅ Yes (small API)                     |
-| Middleware chaining         | ✅ Yes         | ✅ Yes                 | ✅ Yes (global + per-route)            |
-| Route groups                | ✅ Yes         | ✅ Yes                 | ✅ Yes                                 |
-| Validation helpers          | ☑️ Indirect    | ☑️ Indirect            | ✅ Yes (validator integrations)        |
-| Tracing (OTel)              | ☑️ Via contrib | ☑️ Via contrib         | ✅ Built-in middleware                 |
-| Sessions                    | ☑️ Via contrib | ☑️ Via contrib         | ✅ Built-in (in-memory, cookie/header) |
-| Gzip/Request ID/Rate Limit  | ☑️ Via contrib | ☑️ Via contrib         | ✅ Built-in                            |
-| Works with std http.Handler | ✅ Yes         | ❌ No                  | ✅ Yes (Mount/HandleHTTP)              |
-| Graceful shutdown           | ✅ Yes         | ☑️ Partial             | ✅ Yes (context-aware)                 |
-| HTTP/3 future-proof         | ✅ Yes         | ❌ No                  | ✅ Yes                                 |
-| Extensible core             | ✅ Yes         | ✅ Yes                 | ✅ Yes (modular, opt-in)               |
-| Modern Go idioms            | ☑️ Partial     | ☑️ Partial             | ✅ Yes (Go 1.22+, slog, context)       |
-
 ### Key differences and rationale
 
 - **Standard library compatibility:** GoFlash is 100% net/http, so you get HTTP/2+, context cancellation, and all Go ecosystem tools out of the box—no adapters, no surprises.
 - **Performance without trade-offs:** Like Fiber, GoFlash uses pooling and zero-allocation patterns, but never sacrifices reliability or compatibility. You get near-Fiber speed with Gin-level safety.
 - **Minimal, ergonomic API:** Inspired by Fiber’s expressiveness and Gin’s clarity, GoFlash offers a small, explicit API—no magic, no global state, no hidden costs.
-- **Batteries-included, but modular:** All common middleware (logging, recovery, CORS, tracing, sessions, gzip, rate limit, buffer) are built-in and opt-in. You only pay for what you use.
-- **Observability and production readiness:** OpenTelemetry tracing, structured logging, and context helpers are first-class, not afterthoughts. Graceful shutdown and error handling are built-in.
+- **Batteries-included, but modular:** All common middleware (logging, recovery, CORS, sessions, gzip, rate limit, buffer) are built-in and opt-in. You only pay for what you use.
+- **Observability and production readiness:** OpenTelemetry tracing is available via the external [goflash/otel](https://github.com/goflash/otel) module; structured logging and context helpers are first-class. Graceful shutdown and error handling are built-in.
 - **Extensible and future-proof:** Designed for microservices, monoliths, and serverless. Clean project structure, easy to add your own middleware, and ready for new Go features (e.g., generics, slog).
 - **Professional developer experience:** Clear docs, real-world examples, and a focus on explicitness and safety. No hidden magic, no global state, and no “gotchas” for teams scaling up.
 

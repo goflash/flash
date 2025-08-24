@@ -6,15 +6,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"reflect"
 	"strconv"
 	"sync"
 
 	"github.com/julienschmidt/httprouter"
-	ms "github.com/mitchellh/mapstructure"
 )
 
-var newMSDecoder = ms.NewDecoder
+// newMSDecoder moved to bind_json.go
 
 // Ctx is the interface exposed to handlers and middleware.
 // Implemented by *DefaultContext. Located in package ctx to avoid adapters and cycles.
@@ -424,94 +422,7 @@ func (c *DefaultContext) Send(status int, contentType string, b []byte) (int, er
 	return n, err
 }
 
-// BindJSONOptions customizes how BindJSON decodes JSON payloads when binding into structs.
-// All fields are optional and default to false (strict behavior).
-type BindJSONOptions struct {
-	// WeaklyTypedInput allows common type coercions, e.g., "10" -> 10 for int fields.
-	WeaklyTypedInput bool
-	// ErrorUnused when true returns an error for unexpected fields.
-	ErrorUnused bool
-}
-
-// BindJSON decodes the request body JSON into v.
-// If v is a pointer to a struct, behavior can be customized using an optional BindJSONOptions parameter.
-// Defaults: strict decoding using encoding/json with DisallowUnknownFields, no type coercion.
-func (c *DefaultContext) BindJSON(v any, opts ...BindJSONOptions) error {
-	defer c.r.Body.Close()
-
-	var o BindJSONOptions
-	if len(opts) > 0 {
-		o = opts[0]
-	}
-
-	// Non-struct targets: keep strict json decoder behavior regardless of options.
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
-		dec := json.NewDecoder(c.r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(v); err != nil {
-			if fErr := mapJSONStrictError(err, reflect.TypeOf(nil)); fErr != nil { // no struct type context
-				return fErr
-			}
-			return err
-		}
-		return nil
-	}
-	// Capture the target struct type for better error messages
-	targetType := rv.Elem().Type()
-
-	// When no options are enabled, use stdlib decoder for performance and consistent errors.
-	if !o.WeaklyTypedInput && !o.ErrorUnused {
-		dec := json.NewDecoder(c.r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(v); err != nil {
-			if fErr := mapJSONStrictError(err, targetType); fErr != nil {
-				return fErr
-			}
-			return err
-		}
-		return nil
-	}
-
-	// Read body for flexible decoding and analysis.
-	b, err := io.ReadAll(c.r.Body)
-	if err != nil {
-		return err
-	}
-
-	// First unmarshal generically.
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		// Try to convert a type mismatch into a field error when WeaklyTypedInput is false.
-		// encoding/json error messages often look like: "json: cannot unmarshal string into Go struct field User.age of type int"
-		if !o.WeaklyTypedInput {
-			if fErr := tryJSONTypeErrorToField(err, targetType); fErr != nil {
-				return fErr
-			}
-		}
-		return err
-	}
-
-	// Configure map structure based on options.
-	cfg := &ms.DecoderConfig{
-		TagName:          "json",
-		Result:           v,
-		WeaklyTypedInput: o.WeaklyTypedInput,
-		ErrorUnused:      o.ErrorUnused,
-	}
-	dec, err := newMSDecoder(cfg)
-	if err != nil {
-		return err
-	}
-	if err := dec.Decode(m); err != nil {
-		// Map map structure errors to field errors
-		if fe := mapMapStructureError(err, o, targetType); fe != nil {
-			return fe
-		}
-		return err
-	}
-	return nil
-}
+// BindJSON moved to bind_json.go
 
 // Clone returns a shallow copy of the context. Safe for use across goroutines
 // as long as ResponseWriter is swapped to a concurrency-safe writer when needed.
