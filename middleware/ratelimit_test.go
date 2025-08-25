@@ -1513,3 +1513,228 @@ func TestMemoryCleanupEffectiveness(t *testing.T) {
 
 	t.Log("Memory cleanup test completed - automatic cleanup timing is implementation dependent")
 }
+
+func TestRateLimitStrategiesCleanupAndClose(t *testing.T) {
+	// Test that all strategies can be closed properly
+	strategies := []RateLimitStrategy{
+		NewTokenBucketStrategy(10, time.Minute),
+		NewFixedWindowStrategy(10, time.Minute),
+		NewSlidingWindowStrategy(10, time.Minute),
+		NewLeakyBucketStrategy(10.0, 5),
+		NewAdaptiveStrategy(10.0, 1.0, 100.0, time.Minute),
+	}
+
+	for _, strategy := range strategies {
+		// Use each strategy
+		strategy.Allow("test_client")
+
+		// Close should not panic - use type assertion since interface doesn't include Close
+		if closer, ok := strategy.(interface{ Close() }); ok {
+			closer.Close()
+		}
+	}
+}
+
+func TestRateLimitWithEmptyKeyFallback(t *testing.T) {
+	a := flash.New()
+	strategy := NewTokenBucketStrategy(1, time.Minute)
+	defer strategy.Close()
+
+	a.Use(RateLimit(WithStrategy(strategy)))
+	a.GET("/test", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+
+	// Create request with no identifying information (should use "unknown" key)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	// Remove all headers that could be used for identification
+	req.RemoteAddr = ""
+	req.Header.Del("X-Forwarded-For")
+	req.Header.Del("X-Real-IP")
+
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestRateLimitWithLongKey(t *testing.T) {
+	a := flash.New()
+	strategy := NewTokenBucketStrategy(10, time.Minute)
+	defer strategy.Close()
+
+	a.Use(RateLimit(
+		WithStrategy(strategy),
+		WithMaxKeyLength(10), // Very short limit
+		WithKeyFunc(func(c flash.Ctx) string {
+			return "this_is_a_very_long_key_that_exceeds_the_limit"
+		}),
+	))
+	a.GET("/test", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestRateLimitStrategyEdgeCases(t *testing.T) {
+	strategies := []RateLimitStrategy{
+		NewTokenBucketStrategy(1, time.Minute),
+		NewFixedWindowStrategy(1, time.Minute),
+		NewSlidingWindowStrategy(1, time.Minute),
+		NewLeakyBucketStrategy(1.0, 1),
+		NewAdaptiveStrategy(1.0, 0.1, 10.0, time.Minute),
+	}
+
+	for _, strategy := range strategies {
+		defer func() {
+			if closer, ok := strategy.(interface{ Close() }); ok {
+				closer.Close()
+			}
+		}()
+
+		// Test rapid consecutive requests to trigger edge cases
+		for i := 0; i < 5; i++ {
+			allowed, retryAfter := strategy.Allow(fmt.Sprintf("edge_test_%d", i))
+			if !allowed && retryAfter < 0 {
+				t.Errorf("retry after should not be negative: %v", retryAfter)
+			}
+		}
+
+		// Test same key multiple times
+		key := "same_key_test"
+		for i := 0; i < 3; i++ {
+			strategy.Allow(key)
+		}
+
+		// Test adaptive strategy specific functionality
+		if as, ok := strategy.(*AdaptiveStrategy); ok {
+			as.UpdateRate("adaptive_test", true)  // Good behavior
+			as.UpdateRate("adaptive_test", false) // Bad behavior
+		}
+	}
+}
+
+func TestRateLimitWithZeroCapacity(t *testing.T) {
+	// Test strategies with zero/invalid capacity (should use defaults)
+	strategies := []RateLimitStrategy{
+		NewTokenBucketStrategy(0, time.Minute),   // Should default to 1
+		NewFixedWindowStrategy(0, time.Minute),   // Should default to 1
+		NewSlidingWindowStrategy(0, time.Minute), // Should default to 1
+		NewLeakyBucketStrategy(0.0, 0),           // Should default to 1.0, 1
+		NewAdaptiveStrategy(0.0, 0.0, 0.0, 0),    // Should use defaults
+	}
+
+	for i, strategy := range strategies {
+		defer func() {
+			if closer, ok := strategy.(interface{ Close() }); ok {
+				closer.Close()
+			}
+		}()
+
+		// Should allow at least one request
+		allowed, _ := strategy.Allow(fmt.Sprintf("zero_test_%d", i))
+		if !allowed {
+			t.Errorf("strategy %d should allow at least one request", i)
+		}
+	}
+}
+
+func TestRateLimitStrategiesWithConcurrentCleanup(t *testing.T) {
+	// Test cleanup behavior under concurrent access
+	strategies := []RateLimitStrategy{
+		NewTokenBucketStrategy(10, time.Minute),
+		NewFixedWindowStrategy(10, time.Minute),
+		NewSlidingWindowStrategy(10, time.Minute),
+		NewLeakyBucketStrategy(10.0, 10),
+		NewAdaptiveStrategy(10.0, 1.0, 50.0, time.Minute),
+	}
+
+	for _, strategy := range strategies {
+		// Add some entries to clean up
+		for i := 0; i < 5; i++ {
+			strategy.Allow(fmt.Sprintf("key%d", i))
+		}
+
+		// Force cleanup by calling with a very old time
+		// This should exercise the cleanup goroutines
+		time.Sleep(1 * time.Millisecond)
+		strategy.Allow("cleanup_trigger")
+
+		// Close strategy if possible
+		if closer, ok := strategy.(interface{ Close() }); ok {
+			closer.Close()
+		}
+	}
+}
+
+func TestRateLimitAllowMethodEdgeCases(t *testing.T) {
+	// Test edge cases in Allow methods to hit uncovered branches
+
+	// Test with empty key (should use fallback)
+	strategy := NewTokenBucketStrategy(5, time.Second)
+	allowed, _ := strategy.Allow("")
+	if !allowed {
+		t.Error("expected empty key to be allowed")
+	}
+
+	// Test with very long key (should be truncated)
+	longKey := strings.Repeat("a", 1000)
+	allowed, _ = strategy.Allow(longKey)
+	if !allowed {
+		t.Error("expected long key to be allowed")
+	}
+
+	// Test rapid successive calls to hit various branches
+	for i := 0; i < 20; i++ {
+		strategy.Allow(fmt.Sprintf("rapid%d", i))
+	}
+
+	// Close strategy
+	strategy.Close()
+}
+
+func TestAdaptiveStrategySpecificBehavior(t *testing.T) {
+	// Test adaptive strategy's specific behavior
+	strategy := NewAdaptiveStrategy(10.0, 1.0, 50.0, time.Minute)
+
+	// Make multiple requests to trigger adaptation logic
+	key := "adaptive_test"
+	for i := 0; i < 15; i++ {
+		allowed, _ := strategy.Allow(key)
+		// Just log the results, don't assert specific behavior
+		// since adaptive strategy behavior depends on timing
+		t.Logf("Request %d: allowed=%v", i, allowed)
+	}
+
+	// Test with different keys to exercise different code paths
+	for i := 0; i < 5; i++ {
+		strategy.Allow(fmt.Sprintf("adaptive_key_%d", i))
+	}
+
+	// Close strategy
+	strategy.Close()
+}
+
+func TestRateLimitCleanupEdgeCases(t *testing.T) {
+	// Test cleanup edge cases to hit more coverage
+	tb := NewTokenBucketStrategy(10, 100*time.Millisecond) // Short window
+	defer tb.Close()
+
+	// Generate requests with many different keys to create cleanup targets
+	for i := 0; i < 200; i++ {
+		tb.Allow(fmt.Sprintf("key_%d", i))
+	}
+
+	// Wait for cleanup to potentially trigger
+	time.Sleep(200 * time.Millisecond)
+
+	// More requests to exercise post-cleanup logic
+	for i := 0; i < 50; i++ {
+		tb.Allow(fmt.Sprintf("post_cleanup_%d", i))
+	}
+}

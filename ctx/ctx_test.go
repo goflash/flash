@@ -360,3 +360,221 @@ func TestTypedHelpers_DefaultAndNoDefaultFallbacks(t *testing.T) {
 	assert.Equal(t, uint(9), c.QueryUint("missingQu", 9))
 	assert.Equal(t, uint(0), c.QueryUint("missingQu"))
 }
+
+func TestParamInt64WithInvalidValue(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/user/invalid", nil)
+	var c DefaultContext
+	c.Reset(rec, req, httprouter.Params{{Key: "id", Value: "invalid"}}, "/user/:id")
+
+	// Should return default value when parsing fails
+	assert.Equal(t, int64(42), c.ParamInt64("id", 42))
+	assert.Equal(t, int64(0), c.ParamInt64("id"))
+}
+
+func TestQueryInt64WithInvalidValue(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?id=invalid", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Should return default value when parsing fails
+	assert.Equal(t, int64(42), c.QueryInt64("id", 42))
+	assert.Equal(t, int64(0), c.QueryInt64("id"))
+}
+
+func TestQueryFloat64WithInvalidValue(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?price=invalid", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Should return default value when parsing fails
+	assert.Equal(t, 99.99, c.QueryFloat64("price", 99.99))
+	assert.Equal(t, 0.0, c.QueryFloat64("price"))
+}
+
+func TestQueryBoolWithInvalidValue(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?active=invalid", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Should return default value when parsing fails
+	assert.Equal(t, true, c.QueryBool("active", true))
+	assert.Equal(t, false, c.QueryBool("active"))
+}
+
+func TestParamFilenameWithInvalidCharacters(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/file/invalid..file", nil)
+	var c DefaultContext
+	c.Reset(rec, req, httprouter.Params{{Key: "filename", Value: "invalid..file"}}, "/file/:filename")
+
+	// Should return sanitized filename (dots are allowed)
+	result := c.ParamFilename("filename")
+	expected := "invalid..file" // dots are safe filename characters
+	assert.Equal(t, expected, result)
+}
+
+func TestQueryFilenameWithInvalidCharacters(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?file=invalid..file", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Should return sanitized filename (dots are allowed)
+	result := c.QueryFilename("file")
+	expected := "invalid..file" // dots are safe filename characters
+	assert.Equal(t, expected, result)
+}
+
+func TestParamInt64EdgeCases(t *testing.T) {
+	// Test ParamInt64 with various edge cases
+	req, rec := newRequest(http.MethodGet, "/user/9223372036854775807", nil)
+	var c DefaultContext
+	c.Reset(rec, req, httprouter.Params{{Key: "id", Value: "9223372036854775807"}}, "/user/:id")
+
+	// Test max int64
+	assert.Equal(t, int64(9223372036854775807), c.ParamInt64("id"))
+
+	// Test missing param
+	assert.Equal(t, int64(0), c.ParamInt64("missing"))
+
+	// Test with default
+	assert.Equal(t, int64(42), c.ParamInt64("missing", 42))
+}
+
+func TestQueryInt64EdgeCases(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?id=9223372036854775807", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Test max int64
+	assert.Equal(t, int64(9223372036854775807), c.QueryInt64("id"))
+
+	// Test missing query
+	assert.Equal(t, int64(0), c.QueryInt64("missing"))
+
+	// Test with default
+	assert.Equal(t, int64(42), c.QueryInt64("missing", 42))
+}
+
+func TestQueryFloat64EdgeCases(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?price=123.456", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Test valid float
+	assert.Equal(t, 123.456, c.QueryFloat64("price"))
+
+	// Test missing query
+	assert.Equal(t, 0.0, c.QueryFloat64("missing"))
+
+	// Test with default
+	assert.Equal(t, 99.99, c.QueryFloat64("missing", 99.99))
+}
+
+func TestQueryBoolEdgeCases(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/?active=1&inactive=false", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Test various true values
+	assert.Equal(t, true, c.QueryBool("active"))
+	assert.Equal(t, false, c.QueryBool("inactive"))
+
+	// Test missing query
+	assert.Equal(t, false, c.QueryBool("missing"))
+
+	// Test with default
+	assert.Equal(t, true, c.QueryBool("missing", true))
+}
+
+func TestParamFilenameEdgeCases(t *testing.T) {
+	// Test with path traversal attempts
+	req, rec := newRequest(http.MethodGet, "/file/..%2F..%2Fetc%2Fpasswd", nil)
+	var c DefaultContext
+	c.Reset(rec, req, httprouter.Params{{Key: "filename", Value: "../../../etc/passwd"}}, "/file/:filename")
+
+	// Should sanitize path traversal
+	result := c.ParamFilename("filename")
+	expected := ".....etcpasswd" // dots are preserved, slashes removed
+	assert.Equal(t, expected, result)
+
+	// Test empty filename
+	req2, rec2 := newRequest(http.MethodGet, "/file/", nil)
+	c.Reset(rec2, req2, httprouter.Params{{Key: "filename", Value: ""}}, "/file/:filename")
+	assert.Equal(t, "", c.ParamFilename("filename"))
+}
+
+func TestQueryFilenameEdgeCases(t *testing.T) {
+	// Test with path traversal attempts
+	req, rec := newRequest(http.MethodGet, "/?file=../../../etc/passwd", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Should sanitize path traversal
+	result := c.QueryFilename("file")
+	expected := ".....etcpasswd" // dots are preserved, slashes removed
+	assert.Equal(t, expected, result)
+
+	// Test empty query
+	req2, rec2 := newRequest(http.MethodGet, "/", nil)
+	c.Reset(rec2, req2, nil, "/")
+	assert.Equal(t, "", c.QueryFilename("file"))
+}
+
+func TestParamFilenameWithSpecialCharacters(t *testing.T) {
+	// Test ParamFilename with various special characters to hit uncovered branches
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"file.txt", "file.txt"},                           // Normal case
+		{"../../../etc/passwd", ".....etcpasswd"},          // Path traversal (dots preserved, slashes removed)
+		{"file\\with\\backslashes", "filewithbackslashes"}, // Backslashes
+		{"file/with/slashes", "filewithslashes"},           // Forward slashes
+		{"file\x00null", "filenull"},                       // Null bytes
+		{"", ""},                                           // Empty string
+		{"...", ".."},                                      // Just dots (leading dot trimmed)
+		{"file..name", "file..name"},                       // Multiple dots (preserved)
+	}
+
+	for _, tc := range testCases {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+
+		var c DefaultContext
+		c.Reset(rec, req, httprouter.Params{{Key: "filename", Value: tc.input}}, "/test")
+
+		result := c.ParamFilename("filename")
+		if result != tc.expected {
+			t.Errorf("ParamFilename(%q) = %q, expected %q", tc.input, result, tc.expected)
+		}
+	}
+}
+
+func TestQueryFilenameWithSpecialCharacters(t *testing.T) {
+	// Test QueryFilename with various special characters to hit uncovered branches
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"file.txt", "file.txt"},                           // Normal case
+		{"../../../etc/passwd", ".....etcpasswd"},          // Path traversal (dots preserved, slashes removed)
+		{"file\\with\\backslashes", "filewithbackslashes"}, // Backslashes
+		{"file/with/slashes", "filewithslashes"},           // Forward slashes
+		{"file\x00null", "filenull"},                       // Null bytes
+		{"", ""},                                           // Empty string
+		{"...", ".."},                                      // Just dots (leading dot trimmed)
+		{"file..name", "file..name"},                       // Multiple dots (preserved)
+	}
+
+	for _, tc := range testCases {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/test?filename="+url.QueryEscape(tc.input), nil)
+
+		var c DefaultContext
+		c.Reset(rec, req, nil, "/test")
+
+		result := c.QueryFilename("filename")
+		if result != tc.expected {
+			t.Errorf("QueryFilename(%q) = %q, expected %q", tc.input, result, tc.expected)
+		}
+	}
+}

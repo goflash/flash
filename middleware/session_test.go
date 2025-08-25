@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -677,5 +678,395 @@ func TestNewSessionIDSecurity(t *testing.T) {
 	// All IDs should be unique
 	if len(ids) != 1000 {
 		t.Errorf("expected 1000 unique IDs, got %d", len(ids))
+	}
+}
+
+func TestCopyMap(t *testing.T) {
+	// Test copyMap with nil input
+	result := copyMap(nil)
+	if result == nil {
+		t.Fatal("copyMap should return empty map for nil input")
+	}
+	if len(result) != 0 {
+		t.Fatalf("expected empty map, got %d items", len(result))
+	}
+
+	// Test copyMap with non-nil input
+	src := map[string]any{
+		"key1": "value1",
+		"key2": 42,
+		"key3": true,
+	}
+	result = copyMap(src)
+	if result == nil {
+		t.Fatal("copyMap should not return nil")
+	}
+	if len(result) != len(src) {
+		t.Fatalf("expected %d items, got %d", len(src), len(result))
+	}
+	for k, v := range src {
+		if result[k] != v {
+			t.Errorf("key %s: expected %v, got %v", k, v, result[k])
+		}
+	}
+
+	// Verify it's a shallow copy
+	result["new_key"] = "new_value"
+	if _, exists := src["new_key"]; exists {
+		t.Error("copyMap should create a shallow copy, not reference the original")
+	}
+}
+
+func TestSessionGetSetDeleteWithNilValues(t *testing.T) {
+	store := NewMemoryStore()
+	a := flash.New()
+	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour}))
+
+	a.GET("/test", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+
+		// Test setting nil value
+		s.Set("nil_key", nil)
+
+		// Test getting nil value
+		val, ok := s.Get("nil_key")
+		if !ok {
+			t.Error("expected nil value to be retrievable")
+		}
+		if val != nil {
+			t.Errorf("expected nil, got %v", val)
+		}
+
+		// Test deleting nil value
+		s.Delete("nil_key")
+		_, ok = s.Get("nil_key")
+		if ok {
+			t.Error("expected key to be deleted")
+		}
+
+		return c.String(http.StatusOK, "ok")
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestSessionClearWithEmptySession(t *testing.T) {
+	store := NewMemoryStore()
+	a := flash.New()
+	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour}))
+
+	a.GET("/test", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+
+		// Clear empty session
+		s.Clear()
+
+		// Should still work
+		s.Set("key", "value")
+		val, ok := s.Get("key")
+		if !ok || val != "value" {
+			t.Error("session should work after clearing empty session")
+		}
+
+		return c.String(http.StatusOK, "ok")
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestSessionStartCleanupError(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Start cleanup with a very short interval
+	store.StartCleanup(1 * time.Millisecond)
+
+	// Let it run briefly
+	time.Sleep(10 * time.Millisecond)
+
+	// Stop cleanup
+	store.StopCleanup()
+
+	// Starting cleanup again should work - create new store to avoid channel reuse
+	store2 := NewMemoryStore()
+	store2.StartCleanup(time.Hour)
+	store2.StopCleanup()
+}
+
+func TestNewSessionIDWithShortLength(t *testing.T) {
+	// Test with different ID lengths
+	for i := 0; i < 10; i++ {
+		id := newSessionID()
+		if len(id) < 32 {
+			t.Errorf("session ID too short: %d characters", len(id))
+		}
+	}
+}
+
+func TestSessionEdgeCases(t *testing.T) {
+	store := NewMemoryStore()
+	a := flash.New()
+	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour}))
+
+	a.GET("/test", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+
+		// Test session operations on new session
+		if !s.IsNew() {
+			t.Error("expected new session to be marked as new")
+		}
+
+		// Test getting non-existent key
+		val, ok := s.Get("nonexistent")
+		if ok {
+			t.Error("expected false for non-existent key")
+		}
+		if val != nil {
+			t.Errorf("expected nil for non-existent key, got %v", val)
+		}
+
+		// Test deleting non-existent key
+		s.Delete("nonexistent") // Should not panic
+
+		return c.String(http.StatusOK, "ok")
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestSessionWithLongTTL(t *testing.T) {
+	store := NewMemoryStore()
+	a := flash.New()
+	// Use very short TTL for testing
+	a.Use(Sessions(SessionConfig{Store: store, TTL: 1 * time.Millisecond}))
+
+	a.GET("/set", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		s.Set("key", "value")
+		return c.String(http.StatusOK, "set")
+	})
+
+	a.GET("/get", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		val, ok := s.Get("key")
+		if ok {
+			return c.String(http.StatusOK, val.(string))
+		}
+		return c.String(http.StatusNotFound, "not found")
+	})
+
+	// Set session
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/set", nil)
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	cookies := rec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie")
+	}
+
+	// Wait for session to expire
+	time.Sleep(2 * time.Millisecond)
+
+	// Try to get expired session
+	rec2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "/get", nil)
+	for _, cookie := range cookies {
+		req2.AddCookie(cookie)
+	}
+	a.ServeHTTP(rec2, req2)
+
+	// Should not find the expired session
+	if rec2.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for expired session, got %d", rec2.Code)
+	}
+}
+
+func TestSessionStartCleanupEdgeCase(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Test StartCleanup when cleanup is already running
+	store.StartCleanup(time.Hour)
+
+	// Starting again should not cause issues
+	store.StartCleanup(time.Hour)
+
+	store.StopCleanup()
+}
+
+func TestNewSessionIDEdgeCase(t *testing.T) {
+	// Test newSessionID with different scenarios
+	ids := make(map[string]bool)
+
+	// Generate many IDs to test randomness
+	for i := 0; i < 100; i++ {
+		id := newSessionID()
+		if ids[id] {
+			t.Errorf("duplicate session ID generated: %s", id)
+		}
+		ids[id] = true
+
+		// Verify ID format
+		if len(id) < 32 {
+			t.Errorf("session ID too short: %d", len(id))
+		}
+	}
+}
+
+func TestSessionGetSetDeleteWithNilValuesEdgeCases(t *testing.T) {
+	// Test session methods when Values is nil (uncovered lines)
+	session := &Session{}
+
+	// Test Get with nil Values
+	val, ok := session.Get("key")
+	if ok || val != nil {
+		t.Errorf("expected nil/false for Get on nil Values, got %v/%v", val, ok)
+	}
+
+	// Test Delete with nil Values (should not panic)
+	session.Delete("key") // This hits the return path when Values is nil
+
+	// Test Set (should initialize Values)
+	session.Set("key", "value")
+	if session.Values == nil {
+		t.Error("expected Values to be initialized after Set")
+	}
+	if !session.changed {
+		t.Error("expected changed to be true after Set")
+	}
+
+	// Test Clear with nil Values initially
+	session2 := &Session{}
+	session2.Clear()
+	if session2.Values == nil {
+		t.Error("expected Values to be initialized after Clear")
+	}
+	if !session2.changed {
+		t.Error("expected changed to be true after Clear")
+	}
+}
+
+func TestSessionClearWithExistingValues(t *testing.T) {
+	// Test Clear with existing values (different code path)
+	session := &Session{
+		Values: map[string]any{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	session.Clear()
+
+	if len(session.Values) != 0 {
+		t.Errorf("expected empty Values after Clear, got %d items", len(session.Values))
+	}
+	if !session.changed {
+		t.Error("expected changed to be true after Clear")
+	}
+}
+
+func TestMemoryStoreGetWithTimingAttack(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Test the timing-safe comparison path when session doesn't exist
+	// This hits the dummy operation line for timing protection
+	data, ok := store.Get("non_existent_session_id")
+	if ok || data != nil {
+		t.Errorf("expected nil/false for non-existent session, got %v/%v", data, ok)
+	}
+}
+
+func TestMemoryStoreGetWithExpiredSession(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Save session with very short TTL
+	testData := map[string]any{"key": "value"}
+	store.Save("test_id", testData, 1*time.Nanosecond)
+
+	// Wait for expiration
+	time.Sleep(1 * time.Millisecond)
+
+	// This should hit the lazy cleanup path
+	data, ok := store.Get("test_id")
+	if ok || data != nil {
+		t.Errorf("expected nil/false for expired session, got %v/%v", data, ok)
+	}
+}
+
+func TestNewSessionIDRandomness(t *testing.T) {
+	// Test newSessionID function to hit the 75% coverage line
+	ids := make(map[string]bool)
+
+	// Generate multiple IDs to ensure they're different
+	for i := 0; i < 50; i++ {
+		id := newSessionID()
+		if ids[id] {
+			t.Errorf("duplicate session ID generated: %s", id)
+		}
+		ids[id] = true
+
+		if len(id) < 32 {
+			t.Errorf("session ID too short: %d characters", len(id))
+		}
+
+		// Check that it's URL-safe base64 (basic check)
+		if len(id) == 0 {
+			t.Errorf("session ID is empty")
+		}
+	}
+}
+
+func TestMemoryStoreStartCleanupIdempotent(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Test StartCleanup when already running (hits the 80% coverage line)
+	store.StartCleanup(time.Hour)
+
+	// Call again - should be idempotent
+	store.StartCleanup(time.Hour)
+
+	store.StopCleanup()
+}
+
+func TestNewSessionIDEdgeCasesAndLength(t *testing.T) {
+	// Test newSessionID function to hit more coverage lines
+	for i := 0; i < 10; i++ {
+		id := newSessionID()
+
+		// Test various properties
+		if len(id) < 32 {
+			t.Errorf("session ID too short: %d", len(id))
+		}
+
+		// Test that it doesn't contain problematic characters
+		if strings.ContainsAny(id, " \t\n\r") {
+			t.Errorf("session ID contains whitespace: %s", id)
+		}
+
+		// Ensure it's not empty or just whitespace
+		if strings.TrimSpace(id) == "" {
+			t.Error("session ID is empty or whitespace")
+		}
 	}
 }

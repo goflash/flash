@@ -7,4 +7,4 @@ go test $(go list ./... | grep -v /examples/) \
     -coverprofile=tmp/cover.out \
     -covermode=atomic || exit 1
 
-go tool cover -func=tmp/cover.out | sed -n '1,220p'
+go tool cover -func=tmp/cover.out

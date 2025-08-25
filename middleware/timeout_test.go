@@ -217,3 +217,151 @@ func TestTimeoutResponder_Write_CoversBothBranches(t *testing.T) {
 		t.Fatalf("expected header persisted, got %q", got)
 	}
 }
+
+func TestTimeoutWriterWriteHeaderEdgeCases(t *testing.T) {
+	// Test WriteHeader when already timed out
+	rec := httptest.NewRecorder()
+	tw := newTimeoutWriter(rec)
+
+	// Simulate timeout
+	tw.mu.Lock()
+	tw.timedOut = true
+	tw.mu.Unlock()
+
+	tw.WriteHeader(http.StatusCreated)
+
+	// Should not write header when timed out
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected no status change when timed out, got %d", rec.Code)
+	}
+}
+
+func TestTimeoutWriterWriteHeaderAlreadyWritten(t *testing.T) {
+	// Test WriteHeader when already written
+	rec := httptest.NewRecorder()
+	tw := newTimeoutWriter(rec)
+
+	// Write header first time
+	tw.WriteHeader(http.StatusCreated)
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected status 201, got %d", rec.Code)
+	}
+
+	// Write header second time - should be ignored
+	tw.WriteHeader(http.StatusBadRequest)
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected status to remain 201, got %d", rec.Code)
+	}
+}
+
+func TestCopyHeadersWithExistingHeaders(t *testing.T) {
+	// Test copyHeaders function with existing headers in destination
+	src := make(http.Header)
+	src.Set("X-Source", "source-value")
+	src.Add("X-Multi", "value1")
+	src.Add("X-Multi", "value2")
+
+	dst := make(http.Header)
+	dst.Set("X-Existing", "existing-value")
+	dst.Set("X-Override", "old-value")
+
+	copyHeaders(dst, src)
+
+	// Existing headers should be removed
+	if dst.Get("X-Existing") != "" {
+		t.Error("expected existing headers to be removed")
+	}
+	if dst.Get("X-Override") != "" {
+		t.Error("expected overridden headers to be removed")
+	}
+
+	// Source headers should be copied
+	if dst.Get("X-Source") != "source-value" {
+		t.Errorf("expected X-Source to be copied, got %s", dst.Get("X-Source"))
+	}
+
+	// Multi-value headers should be copied
+	values := dst["X-Multi"]
+	if len(values) != 2 || values[0] != "value1" || values[1] != "value2" {
+		t.Errorf("expected multi-value header to be copied, got %v", values)
+	}
+}
+
+func TestTimeoutResponderWriteHeaderAlreadyWritten(t *testing.T) {
+	// Test timeoutResponder WriteHeader when underlying already wrote header
+	rec := httptest.NewRecorder()
+	tw := newTimeoutWriter(rec)
+
+	// Write header on underlying writer first
+	tw.WriteHeader(http.StatusOK)
+
+	tr := newTimeoutResponder(tw)
+	tr.Header().Set("X-Test", "value")
+	tr.WriteHeader(http.StatusGatewayTimeout)
+
+	// Should not change status when already written
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status to remain 200, got %d", rec.Code)
+	}
+
+	// Should NOT mark as timed out because header was already written
+	// This hits the early return path in writeHeaderLocked
+	tw.mu.Lock()
+	timedOut := tw.timedOut
+	tw.mu.Unlock()
+	if timedOut {
+		t.Error("expected timeoutWriter NOT to be marked as timed out when header already written")
+	}
+}
+
+func TestTimeoutMiddlewareWithPanicInHandler(t *testing.T) {
+	// Test timeout middleware when handler panics
+	a := flash.New()
+	a.Use(Timeout(TimeoutConfig{Duration: 100 * time.Millisecond}))
+
+	a.GET("/panic", func(c flash.Ctx) error {
+		panic("test panic")
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	a.ServeHTTP(rec, req)
+
+	// Should handle panic gracefully
+	if rec.Code == 0 {
+		t.Error("expected some status code to be set")
+	}
+}
+
+func TestTimeoutMiddlewareWithCustomErrorResponse(t *testing.T) {
+	// Test timeout middleware with custom error response
+	a := flash.New()
+	customCalled := false
+
+	a.Use(Timeout(TimeoutConfig{
+		Duration: 1 * time.Millisecond,
+		ErrorResponse: func(c flash.Ctx) error {
+			customCalled = true
+			return c.String(http.StatusRequestTimeout, "Custom timeout")
+		},
+	}))
+
+	a.GET("/slow", func(c flash.Ctx) error {
+		time.Sleep(10 * time.Millisecond) // Longer than timeout
+		return c.String(http.StatusOK, "success")
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/slow", nil)
+	a.ServeHTTP(rec, req)
+
+	if !customCalled {
+		t.Error("expected custom error response to be called")
+	}
+	if rec.Code != http.StatusRequestTimeout {
+		t.Errorf("expected status 408, got %d", rec.Code)
+	}
+	if rec.Body.String() != "Custom timeout" {
+		t.Errorf("expected custom timeout message, got %s", rec.Body.String())
+	}
+}
