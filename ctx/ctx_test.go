@@ -960,6 +960,22 @@ func TestNoContent(t *testing.T) {
 	assert.True(t, c.WroteHeader())
 }
 
+func TestNoContentWhenHeadersAlreadyWritten(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Write headers first
+	c.Header("X-Test", "value")
+	c.w.WriteHeader(http.StatusOK)
+	c.wroteHeader = true
+
+	// Now call NoContent - should not change status since headers already written
+	require.NoError(t, c.NoContent())
+	assert.Equal(t, http.StatusOK, rec.Code) // Should remain OK, not NoContent
+	assert.True(t, c.WroteHeader())
+}
+
 func TestStream(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
 	var c DefaultContext
@@ -975,6 +991,40 @@ func TestStream(t *testing.T) {
 	assert.Equal(t, len(content), c.wroteBytes)
 }
 
+func TestStreamWithEmptyContentType(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	content := "streamed content"
+	reader := strings.NewReader(content)
+
+	require.NoError(t, c.Stream(http.StatusOK, "", reader))
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, content, rec.Body.String())
+	assert.Equal(t, "", rec.Header().Get("Content-Type"))
+	assert.Equal(t, len(content), c.wroteBytes)
+}
+
+func TestStreamWhenHeadersAlreadyWritten(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Write headers first
+	c.Header("X-Test", "value")
+	c.w.WriteHeader(http.StatusOK)
+	c.wroteHeader = true
+
+	content := "streamed content"
+	reader := strings.NewReader(content)
+
+	require.NoError(t, c.Stream(http.StatusCreated, "text/plain", reader))
+	assert.Equal(t, http.StatusOK, rec.Code) // Should remain OK, not Created
+	assert.Equal(t, content, rec.Body.String())
+	assert.Equal(t, len(content), c.wroteBytes)
+}
+
 func TestStreamJSON(t *testing.T) {
 	req, rec := newRequest(http.MethodGet, "/", nil)
 	var c DefaultContext
@@ -986,6 +1036,19 @@ func TestStreamJSON(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.Equal(t, "application/json; charset=utf-8", rec.Header().Get("Content-Type"))
 	assert.Equal(t, `{"message":"hello"}`, rec.Body.String())
+}
+
+func TestStreamJSONWithUnencodableData(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Create a channel which cannot be JSON encoded
+	unencodable := make(chan int)
+
+	err := c.StreamJSON(http.StatusOK, unencodable)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "json: unsupported type")
 }
 
 func TestSetCookie(t *testing.T) {
@@ -1048,11 +1111,96 @@ func TestConvenienceMethodsChaining(t *testing.T) {
 	// Test that convenience methods work with status chaining
 	c.Status(http.StatusOK).Header("X-Custom", "value")
 	require.NoError(t, c.NotFound("Custom message"))
-
-	// Status should be overridden by NotFound
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "Custom message", rec.Body.String())
 	assert.Equal(t, "value", rec.Header().Get("X-Custom"))
+}
+
+func TestClone(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Set some state
+	c.Set("key", "value")
+	c.Status(http.StatusOK)
+
+	// Clone the context
+	cloned := c.Clone()
+
+	// Verify it's a separate instance
+	assert.NotSame(t, &c, cloned)
+
+	// Verify state is copied
+	assert.Equal(t, http.StatusOK, cloned.StatusCode())
+	assert.Equal(t, "value", cloned.Get("key"))
+}
+
+func TestFinish(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Finish should not panic
+	assert.NotPanics(t, func() {
+		c.Finish()
+	})
+}
+
+func TestSetRequest(t *testing.T) {
+	req1, rec := newRequest(http.MethodGet, "/", nil)
+	req2, _ := newRequest(http.MethodPost, "/api", nil)
+
+	var c DefaultContext
+	c.Reset(rec, req1, nil, "/")
+
+	// Verify initial request
+	assert.Equal(t, req1, c.Request())
+
+	// Set new request
+	c.SetRequest(req2)
+	assert.Equal(t, req2, c.Request())
+}
+
+func TestSetResponseWriter(t *testing.T) {
+	req, rec1 := newRequest(http.MethodGet, "/", nil)
+	rec2 := httptest.NewRecorder()
+
+	var c DefaultContext
+	c.Reset(rec1, req, nil, "/")
+
+	// Verify initial response writer
+	assert.Equal(t, rec1, c.ResponseWriter())
+
+	// Set new response writer
+	c.SetResponseWriter(rec2)
+	assert.Equal(t, rec2, c.ResponseWriter())
+}
+
+func TestGetWithDefault(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	// Test getting non-existent key with default
+	result := c.Get("nonexistent", "default_value")
+	assert.Equal(t, "default_value", result)
+
+	// Test getting non-existent key without default
+	result = c.Get("nonexistent")
+	assert.Nil(t, result)
+}
+
+func TestSet(t *testing.T) {
+	req, rec := newRequest(http.MethodGet, "/", nil)
+	var c DefaultContext
+	c.Reset(rec, req, nil, "/")
+
+	result := c.Set("test_key", "test_value")
+	assert.Equal(t, &c, result)
+
+	
+	assert.Equal(t, "test_value", c.Get("test_key"))
 }
 
 // Helper functions for testing
