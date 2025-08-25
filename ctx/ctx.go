@@ -4,29 +4,73 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"html"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	router "github.com/julienschmidt/httprouter"
 )
 
-// Ctx is the interface exposed to handlers and middleware.
-// Implemented by *DefaultContext. Located in package ctx to avoid adapters and cycles.
+// Ctx is the request/response context interface exposed to handlers and middleware.
+// It is implemented by *DefaultContext and lives in package ctx to avoid adapters
+// and import cycles.
+//
+// A Ctx provides convenient accessors for request data (method, path, params,
+// query), helpers for retrieving typed parameters, and response helpers for
+// writing headers and bodies in common formats.
+//
+// Typical usage inside a handler:
+//
+//	c.GET("/users/:id", func(c ctx.Ctx) error {
+//	    // Basic request information
+//	    method := c.Method()            // "GET"
+//	    route  := c.Route()             // "/users/:id"
+//	    path   := c.Path()              // e.g. "/users/42"
+//	    id     := c.ParamInt("id", 0)  // 42 (with default if parse fails)
+//	    page   := c.QueryInt("page", 1) // from query string, default 1
+//	    _ = method; _ = route; _ = path; _ = id; _ = page
+//	    // Set a header and send JSON response
+//	    c.Header("X-Handler", "users-show")
+//	    return c.Status(http.StatusOK).JSON(map[string]any{"id": id})
+//	})
+//
+// Concurrency: Ctx is not safe for concurrent writes to the underlying
+// http.ResponseWriter. Use Clone() and swap the writer if responding from
+// another goroutine.
 type Ctx interface {
 	// Request/Response accessors and mutators
+	// Request returns the underlying *http.Request associated with this context.
 	Request() *http.Request
+	// SetRequest replaces the underlying *http.Request on the context.
+	// Example: attach a new context value to the request.
+	//
+	//  	ctx := context.WithValue(c.Context(), key, value)
+	//  	c.SetRequest(c.Request().WithContext(ctx))
 	SetRequest(*http.Request)
+	// ResponseWriter returns the underlying http.ResponseWriter.
 	ResponseWriter() http.ResponseWriter
+	// SetResponseWriter replaces the underlying http.ResponseWriter.
 	SetResponseWriter(http.ResponseWriter)
 
 	// Basic request data
+	// Context returns the request-scoped context.Context.
 	Context() context.Context
+	// Method returns the HTTP method (e.g., "GET").
 	Method() string
+	// Path returns the raw request URL path.
 	Path() string
+	// Route returns the route pattern (e.g., "/users/:id") when available.
 	Route() string
+	// Param returns a path parameter by name ("" if not present).
+	// Example: for route "/users/:id", Param("id") => "42".
 	Param(name string) string
+	// Query returns a query string parameter by key ("" if not present).
+	// Example: for "/items?sort=asc", Query("sort") => "asc".
 	Query(key string) string
 
 	// Typed path parameter helpers with optional defaults
@@ -43,19 +87,36 @@ type Ctx interface {
 	QueryFloat64(key string, def ...float64) float64
 	QueryBool(key string, def ...bool) bool
 
+	// Secure parameter helpers with input validation and sanitization
+	ParamSafe(name string) string     // HTML-escaped parameter
+	QuerySafe(key string) string      // HTML-escaped query parameter
+	ParamAlphaNum(name string) string // Alphanumeric-only parameter
+	QueryAlphaNum(key string) string  // Alphanumeric-only query parameter
+	ParamFilename(name string) string // Safe filename parameter (no path traversal)
+	QueryFilename(key string) string  // Safe filename query parameter
+
 	// Response helpers
+	// Header sets a response header key/value.
 	Header(key, value string)
+	// Status stages the HTTP status code to be written; returns the Ctx to allow chaining.
+	// Example: c.Status(http.StatusCreated).JSON(obj)
 	Status(code int) Ctx
+	// StatusCode returns the status that will be written (or 200 after header write, or 0 if unset).
 	StatusCode() int
+	// JSON serializes v to JSON and writes it with an appropriate Content-Type.
+	// If Status() was not set, it defaults to 200.
 	JSON(v any) error
+	// String writes a text/plain body with the provided status code.
 	String(status int, body string) error
+	// Send writes raw bytes with a specific status and content type.
 	Send(status int, contentType string, b []byte) (int, error)
+	// WroteHeader reports whether the header has already been written to the client.
 	WroteHeader() bool
 
 	// BindJSON decodes request body JSON into v with strict defaults; see BindJSONOptions.
 	BindJSON(v any, opts ...BindJSONOptions) error
 
-	// BindMap binds from a generic map (e.g., collected from body/query/path) into v using mapstructure.
+	// BindMap binds from a generic map (e.g. collected from body/query/path) into v using mapstructure.
 	// Options mirror BindJSONOptions.
 	BindMap(v any, m map[string]any, opts ...BindJSONOptions) error
 
@@ -72,16 +133,21 @@ type Ctx interface {
 	BindAny(v any, opts ...BindJSONOptions) error
 
 	// Utilities
+	// Get retrieves a value from the request context by key, with optional default.
 	Get(key any, def ...any) any
+	// Set stores a value into a derived request context and replaces the underlying request.
 	Set(key, value any) Ctx
 
 	// Clone returns a shallow copy of the context suitable for use in a separate goroutine.
 	Clone() Ctx
 }
 
-// DefaultContext is the request context for goflash handlers and middleware.
+// DefaultContext is the concrete implementation of Ctx used by goflash.
 // It wraps the http.ResponseWriter and *http.Request, exposes convenience helpers,
 // and tracks route, status, and response state for each request.
+//
+// Handlers generally accept the interface type (ctx.Ctx), not *DefaultContext, to
+// allow substituting alternative implementations if desired.
 type DefaultContext struct {
 	w           http.ResponseWriter // underlying response writer
 	r           *http.Request       // underlying request
@@ -94,6 +160,13 @@ type DefaultContext struct {
 }
 
 // Reset prepares the context for a new request. Used internally by the framework.
+// It swaps in the writer, request, params and route pattern, and clears any
+// response state. Libraries and middleware should not need to call Reset.
+//
+// Example:
+//
+//	// internal server code
+//	dctx.Reset(w, r, params, "/users/:id")
 func (c *DefaultContext) Reset(w http.ResponseWriter, r *http.Request, ps router.Params, route string) {
 	c.w = w
 	c.r = r
@@ -106,33 +179,49 @@ func (c *DefaultContext) Reset(w http.ResponseWriter, r *http.Request, ps router
 }
 
 // Finish is a hook for context cleanup after request handling. No-op by default.
+// Frameworks may override or extend this method to release per-request resources.
 func (c *DefaultContext) Finish() {
 	// Reserved for future cleanup; reference receiver to create a coverable statement.
 	_ = c
 }
 
 // Request returns the underlying *http.Request.
+// Use c.Context() to access the request-scoped context values.
 func (c *DefaultContext) Request() *http.Request { return c.r }
 
 // SetRequest replaces the underlying *http.Request.
+// Commonly used to attach a derived context:
+//
+//	ctx := context.WithValue(c.Context(), key, value)
+//	c.SetRequest(c.Request().WithContext(ctx))
 func (c *DefaultContext) SetRequest(r *http.Request) { c.r = r }
 
 // ResponseWriter returns the underlying http.ResponseWriter.
 func (c *DefaultContext) ResponseWriter() http.ResponseWriter { return c.w }
 
 // SetResponseWriter replaces the underlying http.ResponseWriter.
+// This is rarely needed in application code, but useful for testing or when
+// wrapping the writer with middleware.
 func (c *DefaultContext) SetResponseWriter(w http.ResponseWriter) { c.w = w }
 
 // WroteHeader reports whether the response header has been written.
+// After the header is written, changing headers or status has no effect.
 func (c *DefaultContext) WroteHeader() bool { return c.wroteHeader }
 
 // Context returns the request context.Context.
+// It is the same as c.Request().Context().
 func (c *DefaultContext) Context() context.Context { return c.r.Context() }
 
-// Set stores a value in the request context using the provided key.
-// It replaces the request with a clone that carries the new context.
+// Set stores a value in the request context using the provided key and value.
+// It replaces the request with a clone that carries the new context and returns
+// the context for chaining.
 //
 // Note: Prefer using a custom, unexported key type to avoid collisions.
+//
+// Example:
+//
+//	type userKey struct{}
+//	c.Set(userKey{}, currentUser)
 func (c *DefaultContext) Set(key, value any) Ctx {
 	ctx := context.WithValue(c.Context(), key, value)
 	c.SetRequest(c.Request().WithContext(ctx))
@@ -140,8 +229,13 @@ func (c *DefaultContext) Set(key, value any) Ctx {
 }
 
 // Get returns a value from the request context by key.
-// If the key is not present (or the stored value is nil), it returns the provided default
-// when given (Get(key, def)), otherwise it returns nil.
+// If the key is not present (or the stored value is nil), it returns the provided
+// default when given (Get(key, def)), otherwise it returns nil.
+//
+// Example:
+//
+//	type userKey struct{}
+//	u := c.Get(userKey{}).(*User)
 func (c *DefaultContext) Get(key any, def ...any) any {
 	v := c.Context().Value(key)
 	if v != nil {
@@ -153,24 +247,38 @@ func (c *DefaultContext) Get(key any, def ...any) any {
 	return nil
 }
 
-// Method returns the HTTP method for the request.
+// Method returns the HTTP method for the request (e.g., "GET").
 func (c *DefaultContext) Method() string { return c.r.Method }
 
-// Path returns the request URL path.
+// Path returns the request URL path (raw path without scheme/host).
 func (c *DefaultContext) Path() string { return c.r.URL.Path }
 
-// Route returns the route pattern for the current request.
+// Route returns the route pattern for the current request, if known.
+// For example, "/users/:id".
 func (c *DefaultContext) Route() string { return c.route }
 
 // Param returns a path parameter by name. Returns "" if not found.
 // Note: router.Params.ByName returns "" if not found, so this avoids extra allocation.
+//
+// Example:
+//
+//	// Route: /posts/:slug
+//	slug := c.Param("slug")
 func (c *DefaultContext) Param(name string) string { return c.params.ByName(name) }
 
 // Query returns a query string parameter by key. Returns "" if not found.
 // Note: url.Values.Get returns "" if not found, so this avoids extra allocation.
+//
+// Example:
+//
+//	// URL: /search?q=flash
+//	q := c.Query("q")
 func (c *DefaultContext) Query(key string) string { return c.r.URL.Query().Get(key) }
 
-// ParamInt returns the named path parameter parsed as int. Returns def on missing or parse error.
+// ParamInt returns the named path parameter parsed as int.
+// Returns def (or 0) on missing or parse error.
+//
+// Example: c.ParamInt("id", 0) -> 42
 func (c *DefaultContext) ParamInt(name string, def ...int) int {
 	s := c.Param(name)
 	fallback := 0
@@ -187,7 +295,8 @@ func (c *DefaultContext) ParamInt(name string, def ...int) int {
 	return int(v)
 }
 
-// ParamInt64 returns the named path parameter parsed as int64. Returns def on missing or parse error.
+// ParamInt64 returns the named path parameter parsed as int64.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) ParamInt64(name string, def ...int64) int64 {
 	s := c.Param(name)
 	var fallback int64
@@ -206,7 +315,8 @@ func (c *DefaultContext) ParamInt64(name string, def ...int64) int64 {
 	return v
 }
 
-// ParamUint returns the named path parameter parsed as uint. Returns def on missing or parse error.
+// ParamUint returns the named path parameter parsed as uint.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) ParamUint(name string, def ...uint) uint {
 	s := c.Param(name)
 	var fallback uint
@@ -223,7 +333,8 @@ func (c *DefaultContext) ParamUint(name string, def ...uint) uint {
 	return uint(v)
 }
 
-// ParamFloat64 returns the named path parameter parsed as float64. Returns def on missing or parse error.
+// ParamFloat64 returns the named path parameter parsed as float64.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) ParamFloat64(name string, def ...float64) float64 {
 	s := c.Param(name)
 	var fallback float64
@@ -258,7 +369,8 @@ func (c *DefaultContext) ParamBool(name string, def ...bool) bool {
 	return v
 }
 
-// QueryInt returns the query parameter parsed as int. Returns def on missing or parse error.
+// QueryInt returns the query parameter parsed as int.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) QueryInt(key string, def ...int) int {
 	s := c.Query(key)
 	fallback := 0
@@ -275,7 +387,8 @@ func (c *DefaultContext) QueryInt(key string, def ...int) int {
 	return int(v)
 }
 
-// QueryInt64 returns the query parameter parsed as int64. Returns def on missing or parse error.
+// QueryInt64 returns the query parameter parsed as int64.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) QueryInt64(key string, def ...int64) int64 {
 	s := c.Query(key)
 	var fallback int64
@@ -292,7 +405,8 @@ func (c *DefaultContext) QueryInt64(key string, def ...int64) int64 {
 	return v
 }
 
-// QueryUint returns the query parameter parsed as uint. Returns def on missing or parse error.
+// QueryUint returns the query parameter parsed as uint.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) QueryUint(key string, def ...uint) uint {
 	s := c.Query(key)
 	var fallback uint
@@ -309,7 +423,8 @@ func (c *DefaultContext) QueryUint(key string, def ...uint) uint {
 	return uint(v)
 }
 
-// QueryFloat64 returns the query parameter parsed as float64. Returns def on missing or parse error.
+// QueryFloat64 returns the query parameter parsed as float64.
+// Returns def (or 0) on missing or parse error.
 func (c *DefaultContext) QueryFloat64(key string, def ...float64) float64 {
 	s := c.Query(key)
 	var fallback float64
@@ -326,7 +441,8 @@ func (c *DefaultContext) QueryFloat64(key string, def ...float64) float64 {
 	return v
 }
 
-// QueryBool returns the query parameter parsed as bool. Returns def on missing or parse error.
+// QueryBool returns the query parameter parsed as bool.
+// Returns def (or false) on missing or parse error.
 func (c *DefaultContext) QueryBool(key string, def ...bool) bool {
 	s := c.Query(key)
 	fallback := false
@@ -343,15 +459,21 @@ func (c *DefaultContext) QueryBool(key string, def ...bool) bool {
 	return v
 }
 
-// Status sets the response status code (without writing the header yet).
+// Status stages the response status code (without writing the header yet).
 // Returns the context for chaining.
+//
+// Example:
+//
+//  	return c.Status(http.StatusAccepted).JSON(payload)
 
 func (c *DefaultContext) Status(code int) Ctx {
 	c.status = code
 	return c
 }
 
-// StatusCode returns the status code that will be written (or 200 if not set yet).
+// StatusCode returns the status code that will be written.
+// If not set yet and header hasn't been written, returns 0. If the header has
+// already been written without an explicit status, returns 200.
 func (c *DefaultContext) StatusCode() int {
 	if c.status != 0 {
 		return c.status
@@ -363,14 +485,23 @@ func (c *DefaultContext) StatusCode() int {
 }
 
 // Header sets a header on the response.
+// Has no effect after the header is written.
 func (c *DefaultContext) Header(key, value string) { c.w.Header().Set(key, value) }
 
 var jsonBufPool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
 
-// SetJSONEscapeHTML controls whether JSON responses escape HTML characters (default true).
+// SetJSONEscapeHTML controls whether JSON responses escape HTML characters.
+// Default is true to match encoding/json defaults. Set to false when returning
+// HTML-containing JSON that should not be escaped.
 func (c *DefaultContext) SetJSONEscapeHTML(escape bool) { c.jsonEscape = escape }
 
-// JSON writes the provided value as JSON with status code (defaults to 200 if not set).
+// JSON serializes the provided value as JSON and writes the response.
+// If Status() has not been called yet, it defaults to 200 OK.
+// Content-Type is set to "application/json; charset=utf-8" and Content-Length is calculated.
+//
+// Example:
+//
+//	return c.Status(http.StatusCreated).JSON(struct{ ID int `json:"id"` }{ID: 1})
 func (c *DefaultContext) JSON(v any) error {
 	buf := jsonBufPool.Get().(*bytes.Buffer)
 	buf.Reset()
@@ -409,6 +540,11 @@ func (c *DefaultContext) JSON(v any) error {
 }
 
 // String writes a plain text response with the given status and body.
+// Sets Content-Type to "text/plain; charset=utf-8" and Content-Length accordingly.
+//
+// Example:
+//
+//	return c.String(http.StatusOK, "pong")
 func (c *DefaultContext) String(status int, body string) error {
 	if !c.wroteHeader {
 		c.Header("Content-Type", "text/plain; charset=utf-8")
@@ -422,6 +558,13 @@ func (c *DefaultContext) String(status int, body string) error {
 }
 
 // Send writes raw bytes with the given status and content type.
+// If contentType is empty, no Content-Type header is set.
+// Content-Length is set and the header is written once.
+//
+// Example:
+//
+//	data := []byte("<xml>ok</xml>")
+//	_, err := c.Send(http.StatusOK, "application/xml", data)
 func (c *DefaultContext) Send(status int, contentType string, b []byte) (int, error) {
 	if !c.wroteHeader {
 		if contentType != "" {
@@ -436,6 +579,180 @@ func (c *DefaultContext) Send(status int, contentType string, b []byte) (int, er
 	return n, err
 }
 
-// Clone returns a shallow copy of the context. Safe for use across goroutines
-// as long as ResponseWriter is swapped to a concurrency-safe writer when needed.
+// Clone returns a shallow copy of the context.
+// Safe for use across goroutines as long as the ResponseWriter is swapped to a
+// concurrency-safe writer if needed.
 func (c *DefaultContext) Clone() Ctx { cp := *c; return &cp }
+
+// Security-focused parameter and query helpers for input validation and sanitization.
+// These methods help prevent common security vulnerabilities like XSS, path traversal,
+// and injection attacks by sanitizing user input.
+
+// alphaNumRegex matches only alphanumeric characters (a-z, A-Z, 0-9)
+var alphaNumRegex = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
+
+// filenameRegex matches safe filename characters (alphanumeric, dash, underscore, dot)
+var filenameRegex = regexp.MustCompile(`^[a-zA-Z0-9._-]*$`)
+
+// ParamSafe returns a path parameter by name with HTML escaping to prevent XSS.
+// This is useful when the parameter value will be displayed in HTML content.
+//
+// Security: Prevents XSS attacks by escaping HTML special characters.
+//
+// Example:
+//
+//	// Route: /users/:name
+//	// URL: /users/<script>alert('xss')</script>
+//	name := c.ParamSafe("name") // Returns: "&lt;script&gt;alert('xss')&lt;/script&gt;"
+func (c *DefaultContext) ParamSafe(name string) string {
+	return html.EscapeString(c.Param(name))
+}
+
+// QuerySafe returns a query parameter by key with HTML escaping to prevent XSS.
+// This is useful when the query parameter value will be displayed in HTML content.
+//
+// Security: Prevents XSS attacks by escaping HTML special characters.
+//
+// Example:
+//
+//	// URL: /search?q=<script>alert('xss')</script>
+//	q := c.QuerySafe("q") // Returns: "&lt;script&gt;alert('xss')&lt;/script&gt;"
+func (c *DefaultContext) QuerySafe(key string) string {
+	return html.EscapeString(c.Query(key))
+}
+
+// ParamAlphaNum returns a path parameter containing only alphanumeric characters.
+// Non-alphanumeric characters are stripped from the result.
+//
+// Security: Prevents injection attacks by allowing only safe characters.
+//
+// Example:
+//
+//	// Route: /users/:id
+//	// URL: /users/abc123../../../etc/passwd
+//	id := c.ParamAlphaNum("id") // Returns: "abc123"
+func (c *DefaultContext) ParamAlphaNum(name string) string {
+	param := c.Param(name)
+	if param == "" {
+		return ""
+	}
+
+	// Extract only alphanumeric characters
+	var result strings.Builder
+	for _, r := range param {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+// QueryAlphaNum returns a query parameter containing only alphanumeric characters.
+// Non-alphanumeric characters are stripped from the result.
+//
+// Security: Prevents injection attacks by allowing only safe characters.
+//
+// Example:
+//
+//	// URL: /search?category=books&sort=name';DROP TABLE users;--
+//	sort := c.QueryAlphaNum("sort") // Returns: "nameDROPTABLEusers"
+func (c *DefaultContext) QueryAlphaNum(key string) string {
+	query := c.Query(key)
+	if query == "" {
+		return ""
+	}
+
+	// Extract only alphanumeric characters
+	var result strings.Builder
+	for _, r := range query {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+// ParamFilename returns a path parameter as a safe filename.
+// Only allows alphanumeric characters, dots, dashes, and underscores.
+// Prevents path traversal attacks by removing directory separators.
+//
+// Security: Prevents path traversal attacks and ensures safe filenames.
+//
+// Example:
+//
+//	// Route: /files/:name
+//	// URL: /files/../../../etc/passwd
+//	name := c.ParamFilename("name") // Returns: "etcpasswd"
+//
+//	// URL: /files/document.pdf
+//	name := c.ParamFilename("name") // Returns: "document.pdf"
+func (c *DefaultContext) ParamFilename(name string) string {
+	param := c.Param(name)
+	if param == "" {
+		return ""
+	}
+
+	// URL decode first to handle encoded path traversal attempts
+	decoded, err := url.QueryUnescape(param)
+	if err != nil {
+		decoded = param
+	}
+
+	// Extract only safe filename characters
+	var result strings.Builder
+	for _, r := range decoded {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '.' || r == '-' || r == '_' {
+			result.WriteRune(r)
+		}
+	}
+
+	filename := result.String()
+
+	// Prevent hidden files and relative paths
+	filename = strings.TrimPrefix(filename, ".")
+
+	return filename
+}
+
+// QueryFilename returns a query parameter as a safe filename.
+// Only allows alphanumeric characters, dots, dashes, and underscores.
+// Prevents path traversal attacks by removing directory separators.
+//
+// Security: Prevents path traversal attacks and ensures safe filenames.
+//
+// Example:
+//
+//	// URL: /download?file=../../../etc/passwd
+//	file := c.QueryFilename("file") // Returns: "etcpasswd"
+//
+//	// URL: /download?file=document.pdf
+//	file := c.QueryFilename("file") // Returns: "document.pdf"
+func (c *DefaultContext) QueryFilename(key string) string {
+	query := c.Query(key)
+	if query == "" {
+		return ""
+	}
+
+	// URL decode first to handle encoded path traversal attempts
+	decoded, err := url.QueryUnescape(query)
+	if err != nil {
+		decoded = query
+	}
+
+	// Extract only safe filename characters
+	var result strings.Builder
+	for _, r := range decoded {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '.' || r == '-' || r == '_' {
+			result.WriteRune(r)
+		}
+	}
+
+	filename := result.String()
+
+	// Prevent hidden files and relative paths
+	filename = strings.TrimPrefix(filename, ".")
+
+	return filename
+}

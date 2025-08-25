@@ -88,16 +88,28 @@ func TestCORSOptionsWithoutPreflightHeader(t *testing.T) {
 
 func TestCORSCredentialsHeader(t *testing.T) {
 	a := flash.New()
-	a.Use(CORS(CORSConfig{Origins: []string{"*"}, Credentials: true}))
+	a.Use(CORS(CORSConfig{Origins: []string{"https://example.com"}, Credentials: true}))
 	a.GET("/cred", func(c flash.Ctx) error { return c.String(http.StatusOK, "ok") })
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/cred", nil)
+	req.Header.Set("Origin", "https://example.com")
 	a.ServeHTTP(rec, req)
 	if rec.Header().Get("Access-Control-Allow-Credentials") != "true" {
 		t.Fatalf("expected Access-Control-Allow-Credentials=true")
 	}
-	if rec.Header().Get("Access-Control-Allow-Origin") == "" {
-		t.Fatalf("expected Access-Control-Allow-Origin to be set")
+	if rec.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
+		t.Fatalf("expected Access-Control-Allow-Origin to be https://example.com, got %s", rec.Header().Get("Access-Control-Allow-Origin"))
 	}
+}
+
+func TestCORSWildcardWithCredentialsPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic when using wildcard origin with credentials")
+		}
+	}()
+
+	// This should panic due to security check
+	CORS(CORSConfig{Origins: []string{"*"}, Credentials: true})
 }
