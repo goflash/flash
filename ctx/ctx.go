@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	router "github.com/julienschmidt/httprouter"
 )
@@ -112,6 +113,26 @@ type Ctx interface {
 	Send(status int, contentType string, b []byte) (int, error)
 	// WroteHeader reports whether the header has already been written to the client.
 	WroteHeader() bool
+
+	// Convenience methods for common HTTP operations
+	Redirect(status int, url string) error
+	RedirectPermanent(url string) error
+	RedirectTemporary(url string) error
+	File(path string) error
+	FileFromFS(path string, fs http.FileSystem) error
+	NotFound(message ...string) error
+	InternalServerError(message ...string) error
+	BadRequest(message ...string) error
+	Unauthorized(message ...string) error
+	Forbidden(message ...string) error
+	NoContent() error
+	Stream(status int, contentType string, reader io.Reader) error
+	StreamJSON(status int, v any) error
+
+	// Cookie helpers
+	SetCookie(cookie *http.Cookie)
+	GetCookie(name string) (*http.Cookie, error)
+	ClearCookie(name string)
 
 	// BindJSON decodes request body JSON into v with strict defaults; see BindJSONOptions.
 	BindJSON(v any, opts ...BindJSONOptions) error
@@ -577,6 +598,190 @@ func (c *DefaultContext) Send(status int, contentType string, b []byte) (int, er
 	n, err := c.w.Write(b)
 	c.wroteBytes += n
 	return n, err
+}
+
+// Redirect sends a redirect response with the given status code and URL.
+func (c *DefaultContext) Redirect(status int, url string) error {
+	if !c.wroteHeader {
+		c.Header("Location", url)
+		c.w.WriteHeader(status)
+		c.wroteHeader = true
+	}
+	return nil
+}
+
+// RedirectPermanent sends a 301 permanent redirect.
+func (c *DefaultContext) RedirectPermanent(url string) error {
+	return c.Redirect(http.StatusMovedPermanently, url)
+}
+
+// RedirectTemporary sends a 302 temporary redirect.
+func (c *DefaultContext) RedirectTemporary(url string) error {
+	return c.Redirect(http.StatusFound, url)
+}
+
+// File serves a file from the local filesystem.
+func (c *DefaultContext) File(path string) error {
+	return c.FileFromFS(path, http.Dir("."))
+}
+
+// FileFromFS serves a file from the provided http.FileSystem.
+func (c *DefaultContext) FileFromFS(path string, fs http.FileSystem) error {
+	file, err := fs.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	if stat.IsDir() {
+		return c.Forbidden("file is a directory")
+	}
+
+	// Set content type if not already set
+	if !c.wroteHeader {
+		contentType := "application/octet-stream"
+		if ext := strings.ToLower(strings.TrimPrefix(path, ".")); ext != "" {
+			if mimeType := http.DetectContentType([]byte(ext)); mimeType != "application/octet-stream" {
+				contentType = mimeType
+			}
+		}
+		c.Header("Content-Type", contentType)
+		c.w.WriteHeader(http.StatusOK)
+		c.wroteHeader = true
+	}
+
+	// Copy file content to response
+	written, err := io.Copy(c.w, file)
+	c.wroteBytes += int(written)
+	return err
+}
+
+// NotFound sends a 404 Not Found response with optional message.
+func (c *DefaultContext) NotFound(message ...string) error {
+	msg := "Not Found"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	return c.String(http.StatusNotFound, msg)
+}
+
+// InternalServerError sends a 500 Internal Server Error response with optional message.
+func (c *DefaultContext) InternalServerError(message ...string) error {
+	msg := "Internal Server Error"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	return c.String(http.StatusInternalServerError, msg)
+}
+
+// BadRequest sends a 400 Bad Request response with optional message.
+func (c *DefaultContext) BadRequest(message ...string) error {
+	msg := "Bad Request"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	return c.String(http.StatusBadRequest, msg)
+}
+
+// Unauthorized sends a 401 Unauthorized response with optional message.
+func (c *DefaultContext) Unauthorized(message ...string) error {
+	msg := "Unauthorized"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	return c.String(http.StatusUnauthorized, msg)
+}
+
+// Forbidden sends a 403 Forbidden response with optional message.
+func (c *DefaultContext) Forbidden(message ...string) error {
+	msg := "Forbidden"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	return c.String(http.StatusForbidden, msg)
+}
+
+// NoContent sends a 204 No Content response.
+func (c *DefaultContext) NoContent() error {
+	if !c.wroteHeader {
+		c.w.WriteHeader(http.StatusNoContent)
+		c.wroteHeader = true
+	}
+	return nil
+}
+
+// Stream streams data from an io.Reader with the given status and content type.
+func (c *DefaultContext) Stream(status int, contentType string, reader io.Reader) error {
+	if !c.wroteHeader {
+		if contentType != "" {
+			c.Header("Content-Type", contentType)
+		}
+		c.w.WriteHeader(status)
+		c.wroteHeader = true
+	}
+
+	written, err := io.Copy(c.w, reader)
+	c.wroteBytes += int(written)
+	return err
+}
+
+// StreamJSON streams JSON data from an io.Reader with the given status.
+func (c *DefaultContext) StreamJSON(status int, v any) error {
+	buf := jsonBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(c.jsonEscape)
+
+	if err := enc.Encode(v); err != nil {
+		jsonBufPool.Put(buf)
+		return err
+	}
+
+	b := buf.Bytes()
+	// trim trailing newline added by Encoder
+	if n := len(b); n > 0 && b[n-1] == '\n' {
+		b = b[:n-1]
+	}
+
+	if !c.wroteHeader {
+		c.Header("Content-Type", "application/json; charset=utf-8")
+		c.w.WriteHeader(status)
+		c.wroteHeader = true
+	}
+
+	_, err := c.w.Write(b)
+	c.wroteBytes += len(b)
+	buf.Reset()
+	jsonBufPool.Put(buf)
+	return err
+}
+
+// SetCookie sets a cookie in the response.
+func (c *DefaultContext) SetCookie(cookie *http.Cookie) {
+	http.SetCookie(c.w, cookie)
+}
+
+// GetCookie retrieves a cookie from the request by name.
+func (c *DefaultContext) GetCookie(name string) (*http.Cookie, error) {
+	return c.r.Cookie(name)
+}
+
+// ClearCookie removes a cookie by setting it with an expired date.
+func (c *DefaultContext) ClearCookie(name string) {
+	cookie := &http.Cookie{
+		Name:     name,
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		MaxAge:   -1,
+		HttpOnly: true,
+	}
+	c.SetCookie(cookie)
 }
 
 // Clone returns a shallow copy of the context.
