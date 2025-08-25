@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,11 +50,14 @@ func TestRecoverMiddlewareWithCustomErrorResponse(t *testing.T) {
 
 func TestRecoverMiddlewareWithOnPanic(t *testing.T) {
 	a := flash.New()
+	var mu sync.Mutex
 	panicCalled := false
 	var panicValue interface{}
 
 	a.Use(Recover(RecoverConfig{
 		OnPanic: func(c flash.Ctx, err interface{}) {
+			mu.Lock()
+			defer mu.Unlock()
 			panicCalled = true
 			panicValue = err
 		},
@@ -67,6 +71,8 @@ func TestRecoverMiddlewareWithOnPanic(t *testing.T) {
 	// Give the goroutine time to execute
 	time.Sleep(10 * time.Millisecond)
 
+	mu.Lock()
+	defer mu.Unlock()
 	if !panicCalled {
 		t.Error("OnPanic callback was not called")
 	}
