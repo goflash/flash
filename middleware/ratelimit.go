@@ -626,42 +626,21 @@ func (tb *TokenBucketStrategy) Name() string {
 func (tb *TokenBucketStrategy) Allow(key string) (bool, time.Duration) {
 	now := time.Now()
 
-	// Try read lock first for better performance
-	tb.mu.RLock()
-	bucket := tb.buckets[key]
-	tb.mu.RUnlock()
-
-	// Handle new bucket or expired bucket
-	if bucket == nil || now.After(bucket.reset) {
-		tb.mu.Lock()
-		// Double-check after acquiring write lock
-		bucket = tb.buckets[key]
-		if bucket == nil || now.After(bucket.reset) {
-			bucket = &tokenBucket{
-				remaining: tb.capacity - 1,
-				reset:     now.Add(tb.refill),
-			}
-			tb.buckets[key] = bucket
-		}
-		tb.mu.Unlock()
-		return true, 0
-	}
-
-	// Handle existing bucket
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
-	// Re-check bucket state after acquiring lock
-	bucket = tb.buckets[key]
+	bucket := tb.buckets[key]
+
+	// Handle new bucket or expired bucket
 	if bucket == nil || now.After(bucket.reset) {
 		bucket = &tokenBucket{
-			remaining: tb.capacity - 1,
+			remaining: tb.capacity,
 			reset:     now.Add(tb.refill),
 		}
 		tb.buckets[key] = bucket
-		return true, 0
 	}
 
+	// Check if we can consume a token
 	if bucket.remaining > 0 {
 		bucket.remaining--
 		return true, 0
