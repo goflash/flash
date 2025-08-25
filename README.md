@@ -5,7 +5,7 @@
         </picture>
     </a>
     <br />
-    <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.7">
+    <a href="https://pkg.go.dev/github.com/goflash/flash/v2@v2.0.0-beta.8">
         <img src="https://pkg.go.dev/badge/github.com/goflash/flash.svg" alt="Go Reference">
     </a>
     <a href="https://goreportcard.com/report/github.com/goflash/flash">
