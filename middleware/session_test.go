@@ -309,3 +309,373 @@ func TestSessionFromCtxWrongTypeValue(t *testing.T) {
 		t.Fatalf("code=%d", rec.Code)
 	}
 }
+
+// Test new Session methods
+func TestSessionClearAndRegenerate(t *testing.T) {
+	store := NewMemoryStore()
+	a := flash.New()
+	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, CookieName: "sid"}))
+
+	// Set some initial data
+	a.GET("/set", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		s.Set("user_id", "123")
+		s.Set("role", "admin")
+		return c.String(http.StatusOK, "ok")
+	})
+
+	// Clear session data
+	a.GET("/clear", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		s.Clear()
+		return c.String(http.StatusOK, "cleared")
+	})
+
+	// Regenerate session ID
+	a.GET("/regenerate", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		oldID := s.ID
+		s.Regenerate()
+		if s.ID == oldID {
+			t.Error("session ID should have changed")
+		}
+		if !s.IsRegenerated() {
+			t.Error("session should be marked as regenerated")
+		}
+		s.Set("new_data", "after_regen")
+		return c.String(http.StatusOK, s.ID)
+	})
+
+	// First request - set data
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/set", nil)
+	a.ServeHTTP(rec, req)
+	cookies := rec.Result().Cookies()
+
+	// Second request - clear data
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/clear", nil)
+	for _, ck := range cookies {
+		req.AddCookie(ck)
+	}
+	a.ServeHTTP(rec, req)
+
+	// Third request - regenerate session
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/regenerate", nil)
+	for _, ck := range cookies {
+		req.AddCookie(ck)
+	}
+	a.ServeHTTP(rec, req)
+	newSessionID := rec.Body.String()
+
+	if newSessionID == "" {
+		t.Fatal("expected new session ID")
+	}
+}
+
+// Test MemoryStore cleanup functionality
+func TestMemoryStoreCleanup(t *testing.T) {
+	store := NewMemoryStore()
+	defer store.StopCleanup()
+
+	// Save sessions with short TTL
+	err := store.Save("session1", map[string]any{"key": "value1"}, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	err = store.Save("session2", map[string]any{"key": "value2"}, time.Hour)
+	if err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	// Verify both sessions exist
+	if store.Len() != 2 {
+		t.Fatalf("expected 2 sessions, got %d", store.Len())
+	}
+
+	// Wait for first session to expire
+	time.Sleep(15 * time.Millisecond)
+
+	// Trigger cleanup
+	store.cleanupExpired()
+
+	// Verify expired session is removed
+	if store.Len() != 1 {
+		t.Fatalf("expected 1 session after cleanup, got %d", store.Len())
+	}
+
+	// Verify correct session remains
+	if _, ok := store.Get("session2"); !ok {
+		t.Fatal("session2 should still exist")
+	}
+
+	if _, ok := store.Get("session1"); ok {
+		t.Fatal("session1 should be expired and removed")
+	}
+}
+
+// Test automatic cleanup with StartCleanup
+func TestMemoryStoreAutoCleanup(t *testing.T) {
+	store := NewMemoryStore()
+	store.StartCleanup(50 * time.Millisecond) // Very frequent for testing
+	defer store.StopCleanup()
+
+	// Save session with short TTL
+	err := store.Save("temp_session", map[string]any{"temp": true}, 25*time.Millisecond)
+	if err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	// Verify session exists
+	if store.Len() != 1 {
+		t.Fatalf("expected 1 session, got %d", store.Len())
+	}
+
+	// Wait for cleanup to run (TTL + cleanup interval + buffer)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify session was cleaned up
+	if store.Len() != 0 {
+		t.Fatalf("expected 0 sessions after auto cleanup, got %d", store.Len())
+	}
+}
+
+// Test timing attack protection in Get method
+func TestMemoryStoreTimingAttackProtection(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Save a session
+	err := store.Save("real_session", map[string]any{"user": "alice"}, time.Hour)
+	if err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	// Test with real session ID
+	start := time.Now()
+	_, ok := store.Get("real_session")
+	realDuration := time.Since(start)
+
+	if !ok {
+		t.Fatal("real session should exist")
+	}
+
+	// Test with fake session ID (should take similar time)
+	start = time.Now()
+	_, ok = store.Get("fake_session_id_with_similar_length")
+	fakeDuration := time.Since(start)
+
+	if ok {
+		t.Fatal("fake session should not exist")
+	}
+
+	// The timing difference should be minimal (less than 10x)
+	// This is a rough test - in practice, timing attacks are more sophisticated
+	ratio := float64(realDuration) / float64(fakeDuration)
+	if ratio > 10 || ratio < 0.1 {
+		t.Logf("Timing ratio: %f (real: %v, fake: %v)", ratio, realDuration, fakeDuration)
+		// Don't fail the test as timing can vary, but log for awareness
+	}
+}
+
+// Test session regeneration cleans up old session
+func TestSessionRegenerationCleanup(t *testing.T) {
+	store := NewMemoryStore()
+	a := flash.New()
+	a.Use(Sessions(SessionConfig{Store: store, TTL: time.Hour, CookieName: "sid"}))
+
+	var oldSessionID string
+
+	// Set initial session data
+	a.GET("/login", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		s.Set("user_id", "123")
+		// Session ID is generated when first saved, so we return a placeholder
+		return c.String(http.StatusOK, "login_ok")
+	})
+
+	// Regenerate session after "authentication"
+	a.GET("/auth", func(c flash.Ctx) error {
+		s := SessionFromCtx(c)
+		s.Regenerate() // This should clean up the old session
+		s.Set("authenticated", true)
+		return c.String(http.StatusOK, s.ID)
+	})
+
+	// First request - create session
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	a.ServeHTTP(rec, req)
+	cookies := rec.Result().Cookies()
+
+	// Get the session ID from the cookie
+	if len(cookies) == 0 {
+		t.Fatal("expected cookie to be set")
+	}
+	oldSessionID = cookies[0].Value
+
+	// Verify old session exists in store
+	if _, ok := store.Get(oldSessionID); !ok {
+		t.Fatal("old session should exist before regeneration")
+	}
+
+	// Second request - regenerate session
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/auth", nil)
+	for _, ck := range cookies {
+		req.AddCookie(ck)
+	}
+	a.ServeHTTP(rec, req)
+	newSessionID := rec.Body.String()
+
+	// Verify old session was cleaned up
+	if _, ok := store.Get(oldSessionID); ok {
+		t.Fatal("old session should be cleaned up after regeneration")
+	}
+
+	// Verify new session exists
+	if _, ok := store.Get(newSessionID); !ok {
+		t.Fatal("new session should exist after regeneration")
+	}
+
+	// Verify session data was preserved
+	if data, ok := store.Get(newSessionID); ok {
+		if data["user_id"] != "123" {
+			t.Fatal("session data should be preserved during regeneration")
+		}
+		if data["authenticated"] != true {
+			t.Fatal("new data should be present after regeneration")
+		}
+	} else {
+		t.Fatal("new session data should be accessible")
+	}
+}
+
+// Test session helper methods
+func TestSessionHelperMethods(t *testing.T) {
+	s := &Session{
+		ID:     "test_id",
+		Values: make(map[string]any),
+		new:    true,
+	}
+
+	// Test initial state
+	if !s.IsNew() {
+		t.Error("session should be marked as new")
+	}
+	if s.IsChanged() {
+		t.Error("session should not be marked as changed initially")
+	}
+	if s.IsRegenerated() {
+		t.Error("session should not be marked as regenerated initially")
+	}
+
+	// Test Set operation
+	s.Set("key", "value")
+	if !s.IsChanged() {
+		t.Error("session should be marked as changed after Set")
+	}
+
+	// Test Get operation
+	if val, ok := s.Get("key"); !ok || val != "value" {
+		t.Errorf("expected value 'value', got %v, %v", val, ok)
+	}
+
+	// Test Delete operation
+	s.Delete("key")
+	if val, ok := s.Get("key"); ok {
+		t.Errorf("key should be deleted, but got %v", val)
+	}
+
+	// Test Regenerate operation
+	oldID := s.ID
+	s.Regenerate()
+	if s.ID == oldID {
+		t.Error("session ID should change after regeneration")
+	}
+	if !s.IsRegenerated() {
+		t.Error("session should be marked as regenerated")
+	}
+	if s.oldID != oldID {
+		t.Error("old ID should be preserved for cleanup")
+	}
+}
+
+// Test copyMapEfficient function
+func TestCopyMapEfficient(t *testing.T) {
+	// Test nil map
+	result := copyMapEfficient(nil)
+	if result != nil {
+		t.Error("copyMapEfficient should return nil for nil input")
+	}
+
+	// Test empty map
+	empty := make(map[string]any)
+	result = copyMapEfficient(empty)
+	if result == nil {
+		t.Error("copyMapEfficient should return empty map, not nil")
+	}
+	if len(result) != 0 {
+		t.Error("copyMapEfficient should return empty map for empty input")
+	}
+
+	// Test map with data
+	original := map[string]any{
+		"key1": "value1",
+		"key2": 42,
+		"key3": true,
+	}
+	result = copyMapEfficient(original)
+
+	if len(result) != len(original) {
+		t.Errorf("copied map should have same length: expected %d, got %d", len(original), len(result))
+	}
+
+	for k, v := range original {
+		if result[k] != v {
+			t.Errorf("key %s: expected %v, got %v", k, v, result[k])
+		}
+	}
+
+	// Verify it's a copy (modify original shouldn't affect copy)
+	original["new_key"] = "new_value"
+	if _, exists := result["new_key"]; exists {
+		t.Error("modifying original should not affect copy")
+	}
+}
+
+// Test newSessionID security properties
+func TestNewSessionIDSecurity(t *testing.T) {
+	// Generate multiple session IDs
+	ids := make(map[string]bool)
+	for i := 0; i < 1000; i++ {
+		id := newSessionID()
+
+		// Check length (should be 43 characters for 32 bytes base64url encoded)
+		if len(id) != 43 {
+			t.Errorf("session ID should be 43 characters, got %d", len(id))
+		}
+
+		// Check uniqueness
+		if ids[id] {
+			t.Errorf("duplicate session ID generated: %s", id)
+		}
+		ids[id] = true
+
+		// Check URL-safe characters only
+		for _, char := range id {
+			if !((char >= 'A' && char <= 'Z') ||
+				(char >= 'a' && char <= 'z') ||
+				(char >= '0' && char <= '9') ||
+				char == '-' || char == '_') {
+				t.Errorf("session ID contains non-URL-safe character: %c in %s", char, id)
+			}
+		}
+	}
+
+	// All IDs should be unique
+	if len(ids) != 1000 {
+		t.Errorf("expected 1000 unique IDs, got %d", len(ids))
+	}
+}

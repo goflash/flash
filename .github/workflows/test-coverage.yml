@@ -30,22 +30,22 @@ jobs:
         run: go mod download
 
       - name: Run tests (no coverage)
-        if: matrix.go != '1.23.x'
-        run: go test $(go list ./... | grep -v /examples/) -v -race
+        if: matrix.go != 'stable'
+        run: go test ./... -v -race
 
       - name: Run tests with coverage
-        if: matrix.go == '1.23.x'
-        run: go test $(go list ./... | grep -v /examples/) -v -race -covermode=atomic -coverprofile=coverage.out
+        if: matrix.go == 'stable'
+        run: go test ./... -v -race -covermode=atomic -coverprofile=coverage.out
 
       - name: Upload coverage artifact
-        if: matrix.go == '1.23.x'
+        if: matrix.go == 'stable'
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage.out
 
       - name: Upload coverage to Codecov
-        if: matrix.go == '1.23.x'
+        if: matrix.go == 'stable'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
