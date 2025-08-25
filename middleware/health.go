@@ -100,9 +100,20 @@ func RegisterHealthCheck(app flash.App, cfg HealthCheckConfig) {
 	}
 
 	// Sanitize the path
-	sanitizedPath := security.SanitizePath(cfg.Path)
-	if sanitizedPath == "" {
-		// If path sanitization fails, use default
+		// Log a warning if path sanitization fails, then use default
+		// Using standard log package for simplicity
+		// You may replace this with your preferred logging mechanism
+		// (e.g., a package-level logger or app logger if available)
+		// import "log" at the top if not already imported
+		// log.Printf("WARNING: Invalid health check path '%s', falling back to '/health'", cfg.Path)
+		// Since imports can't be changed, use the standard log package if available, else comment
+		// For this snippet, let's assume log is available
+		// If not, this can be uncommented when log is imported
+		// log.Printf("WARNING: Invalid health check path '%s', falling back to '/health'", cfg.Path)
+		// If log is not available, you can use fmt.Println as a fallback
+		// fmt.Printf("WARNING: Invalid health check path '%s', falling back to '/health'\n", cfg.Path)
+		// For now, use fmt.Println
+		println("WARNING: Invalid health check path '" + cfg.Path + "', falling back to '/health'")
 		sanitizedPath = "/health"
 	}
 
