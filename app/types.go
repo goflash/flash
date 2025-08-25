@@ -30,7 +30,7 @@ type App interface {
 	StaticDirs(prefix string, dirs ...string)
 
 	// Grouping
-	Group(prefix string, mw ...Middleware) *Group
+	Group(prefix string, mws ...Middleware) *Group
 
 	// Logging
 	SetLogger(l *slog.Logger)
