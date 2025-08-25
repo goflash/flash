@@ -639,7 +639,7 @@ func (c *DefaultContext) FileFromFS(path string, fs http.FileSystem) error {
 	}
 
 	if stat.IsDir() {
-		return c.NotFound("file is a directory")
+		return c.Forbidden()
 	}
 
 	// Set content type if not already set
