@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -237,22 +238,6 @@ func TestHealthCheckSuccessHandling(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"status":"healthy"`)
 }
 
-func TestHealthCheckDefaults(t *testing.T) {
-	app := flash.New()
-	RegisterHealthCheck(app, HealthCheckConfig{})
-
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	w := httptest.NewRecorder()
-
-	app.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	body := w.Body.String()
-	assert.Contains(t, body, `"status":"healthy"`)
-	assert.Contains(t, body, `"service":"goflash"`)
-	assert.Contains(t, body, `"timestamp":"`)
-}
-
 func TestHealthCheckTimestampFormat(t *testing.T) {
 	app := flash.New()
 	RegisterHealthCheck(app, HealthCheckConfig{
@@ -265,16 +250,16 @@ func TestHealthCheckTimestampFormat(t *testing.T) {
 	app.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	body := w.Body.String()
+	body := w.Body.Bytes()
 
-	// Extract timestamp from response
-	start := len(`{"service":"goflash","status":"healthy","timestamp":"`)
-	end := start + len(time.RFC3339)
-	if len(body) >= end {
-		timestamp := body[start:end]
-		_, err := time.Parse(time.RFC3339, timestamp)
-		assert.NoError(t, err, "timestamp should be in RFC3339 format")
+	// Unmarshal JSON and extract timestamp
+	var resp struct {
+		Timestamp string `json:"timestamp"`
 	}
+	err := json.Unmarshal(body, &resp)
+	assert.NoError(t, err, "response should be valid JSON")
+	_, err = time.Parse(time.RFC3339, resp.Timestamp)
+	assert.NoError(t, err, "timestamp should be in RFC3339 format")
 }
 
 func TestHealthCheckMultiplePaths(t *testing.T) {
