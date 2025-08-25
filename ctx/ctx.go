@@ -642,9 +642,23 @@ func (c *DefaultContext) FileFromFS(path string, fs http.FileSystem) error {
 		return c.NotFound("file is a directory")
 	}
 
-	http.ServeContent(c.w, c.r, stat.Name(), stat.ModTime(), file)
-	c.wroteHeader = true
-	return nil
+	// Set content type if not already set
+	if !c.wroteHeader {
+		contentType := "application/octet-stream"
+		if ext := strings.ToLower(strings.TrimPrefix(path, ".")); ext != "" {
+			if mimeType := http.DetectContentType([]byte(ext)); mimeType != "application/octet-stream" {
+				contentType = mimeType
+			}
+		}
+		c.Header("Content-Type", contentType)
+		c.w.WriteHeader(http.StatusOK)
+		c.wroteHeader = true
+	}
+
+	// Copy file content to response
+	written, err := io.Copy(c.w, file)
+	c.wroteBytes += int(written)
+	return err
 }
 
 // NotFound sends a 404 Not Found response with optional message.
