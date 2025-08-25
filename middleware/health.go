@@ -6,6 +6,7 @@ import (
 
 	"github.com/goflash/flash/v2"
 	"github.com/goflash/flash/v2/ctx"
+	"github.com/goflash/flash/v2/security"
 )
 
 // HealthCheckFunc is a function that performs health checks and returns an error if unhealthy.
@@ -98,8 +99,15 @@ func RegisterHealthCheck(app flash.App, cfg HealthCheckConfig) {
 		cfg.ServiceName = "goflash"
 	}
 
+	// Sanitize the path
+	sanitizedPath := security.SanitizePath(cfg.Path)
+	if sanitizedPath == "" {
+		// If path sanitization fails, use default
+		sanitizedPath = "/health"
+	}
+
 	// Register the health check route
-	app.GET(cfg.Path, healthCheckHandler(cfg))
+	app.GET(sanitizedPath, healthCheckHandler(cfg))
 }
 
 // HealthCheckWithPath is a convenience function that creates a health check configuration

@@ -28,7 +28,7 @@ build/
 dist/
 out/
 tmp/
-coverage/
+coverage
 
 # Logs
 *.log
