@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -914,6 +915,26 @@ func (m *mockCtx) BindAny(any, ...ctx.BindJSONOptions) error                 { r
 func (m *mockCtx) Get(any, ...any) any                                       { return nil }
 func (m *mockCtx) Set(any, any) flash.Ctx                                    { return m }
 func (m *mockCtx) Clone() flash.Ctx                                          { return m }
+
+// Convenience methods
+func (m *mockCtx) Redirect(status int, url string) error                         { return nil }
+func (m *mockCtx) RedirectPermanent(url string) error                            { return nil }
+func (m *mockCtx) RedirectTemporary(url string) error                            { return nil }
+func (m *mockCtx) File(path string) error                                        { return nil }
+func (m *mockCtx) FileFromFS(path string, fs http.FileSystem) error              { return nil }
+func (m *mockCtx) NotFound(message ...string) error                              { return nil }
+func (m *mockCtx) InternalServerError(message ...string) error                   { return nil }
+func (m *mockCtx) BadRequest(message ...string) error                            { return nil }
+func (m *mockCtx) Unauthorized(message ...string) error                          { return nil }
+func (m *mockCtx) Forbidden(message ...string) error                             { return nil }
+func (m *mockCtx) NoContent() error                                              { return nil }
+func (m *mockCtx) Stream(status int, contentType string, reader io.Reader) error { return nil }
+func (m *mockCtx) StreamJSON(status int, v any) error                            { return nil }
+
+// Cookie helpers
+func (m *mockCtx) SetCookie(cookie *http.Cookie)               {}
+func (m *mockCtx) GetCookie(name string) (*http.Cookie, error) { return nil, nil }
+func (m *mockCtx) ClearCookie(name string)                     {}
 
 func TestCleanupFunctions(t *testing.T) {
 	// Test cleanup functions by creating strategies with very short intervals
