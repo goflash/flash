@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"bufio"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -323,4 +325,108 @@ func TestBufferRespectsPreSetContentLength(t *testing.T) {
 	if got := rec.Header().Get("Content-Length"); got != "99" {
 		t.Fatalf("Content-Length should be preserved, got %q", got)
 	}
+}
+
+// hijackableRecorder wraps a ResponseRecorder and implements http.Hijacker.
+type hijackableRecorder struct {
+	*httptest.ResponseRecorder
+	hijacked bool
+}
+
+func (h *hijackableRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h.hijacked = true
+	c1, c2 := net.Pipe()
+	// Close both ends immediately; we only care about delegation path
+	rw := bufio.NewReadWriter(bufio.NewReader(c1), bufio.NewWriter(c1))
+	_ = c2.Close()
+	return c1, rw, nil
+}
+
+// pusherRecorder wraps a ResponseRecorder and implements http.Pusher.
+type pusherRecorder struct {
+	*httptest.ResponseRecorder
+	pushed []string
+}
+
+func (p *pusherRecorder) Push(target string, opts *http.PushOptions) error {
+	p.pushed = append(p.pushed, target)
+	return nil
+}
+
+func TestBufferHijackDelegationAndUnsupported(t *testing.T) {
+	t.Run("delegates when underlying supports hijack", func(t *testing.T) {
+		a := flash.New()
+		a.Use(Buffer())
+		called := false
+		a.GET("/h", func(c flash.Ctx) error {
+			called = true
+			hj := c.ResponseWriter().(http.Hijacker)
+			conn, rw, err := hj.Hijack()
+			if err != nil || conn == nil || rw == nil {
+				t.Fatalf("hijack failed: conn=%v rw=%v err=%v", conn, rw, err)
+			}
+			_ = conn.Close()
+			return nil
+		})
+		rec := &hijackableRecorder{ResponseRecorder: httptest.NewRecorder()}
+		req := httptest.NewRequest(http.MethodGet, "/h", nil)
+		a.ServeHTTP(rec, req)
+		if !called {
+			t.Fatalf("handler not called")
+		}
+		if !rec.hijacked {
+			t.Fatalf("expected underlying Hijack to be called")
+		}
+	})
+
+	t.Run("returns ErrNotSupported when underlying lacks hijack", func(t *testing.T) {
+		a := flash.New()
+		a.Use(Buffer())
+		var gotErr error
+		a.GET("/h2", func(c flash.Ctx) error {
+			_, _, gotErr = c.ResponseWriter().(http.Hijacker).Hijack()
+			return nil
+		})
+		rec := httptest.NewRecorder() // no Hijacker support underneath
+		req := httptest.NewRequest(http.MethodGet, "/h2", nil)
+		a.ServeHTTP(rec, req)
+		if gotErr != http.ErrNotSupported {
+			t.Fatalf("expected ErrNotSupported, got %v", gotErr)
+		}
+	})
+}
+
+func TestBufferPushDelegationAndUnsupported(t *testing.T) {
+	t.Run("delegates to underlying Pusher", func(t *testing.T) {
+		a := flash.New()
+		a.Use(Buffer())
+		a.GET("/p", func(c flash.Ctx) error {
+			if err := c.ResponseWriter().(http.Pusher).Push("/style.css", nil); err != nil {
+				t.Fatalf("push failed: %v", err)
+			}
+			return nil
+		})
+		rec := &pusherRecorder{ResponseRecorder: httptest.NewRecorder()}
+		req := httptest.NewRequest(http.MethodGet, "/p", nil)
+		a.ServeHTTP(rec, req)
+		if len(rec.pushed) != 1 || rec.pushed[0] != "/style.css" {
+			t.Fatalf("expected one push to /style.css, got %+v", rec.pushed)
+		}
+	})
+
+	t.Run("returns ErrNotSupported when underlying lacks pusher", func(t *testing.T) {
+		a := flash.New()
+		a.Use(Buffer())
+		var errPush error
+		a.GET("/p2", func(c flash.Ctx) error {
+			errPush = c.ResponseWriter().(http.Pusher).Push("/x", nil)
+			return nil
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/p2", nil)
+		a.ServeHTTP(rec, req)
+		if errPush != http.ErrNotSupported {
+			t.Fatalf("expected ErrNotSupported, got %v", errPush)
+		}
+	})
 }

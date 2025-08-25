@@ -13,9 +13,31 @@ import (
 // newMSDecoder is a package-level hook to allow tests to stub map structure decoder creation.
 var newMSDecoder = ms.NewDecoder
 
-// BindJSONOptions customizes how BindJSON decodes JSON payloads when binding into structs.
-// Defaults when options are omitted: ErrorUnused=true, WeaklyTypedInput=false.
+// BindJSONOptions customizes how JSON and map binding decode payloads into structs.
+//
+// Defaults when options are omitted:
+//   - ErrorUnused = true  (unknown fields cause an error)
+//   - WeaklyTypedInput = false (no implicit type coercion)
+//
 // If an options value is provided explicitly, its zero-values are honored as-is.
+//
+// Example (strict decoding, reject unknown fields):
+//
+//	type User struct {
+//		ID   int    `json:"id"`
+//		Name string `json:"name"`
+//	}
+//
+//	var u User
+//	err := c.BindJSON(&u) // same as c.BindJSON(&u, BindJSONOptions{ErrorUnused: true})
+//	if fe, ok := ctx.AsFieldErrors(err); ok {
+//		// fe["extra"] == "unexpected field" when body contains unknown key "extra"
+//	}
+//
+// Example (allow coercion, allow unknown fields):
+//
+//	var u User
+//	_ = c.BindJSON(&u, BindJSONOptions{WeaklyTypedInput: true, ErrorUnused: false})
 type BindJSONOptions struct {
 	// WeaklyTypedInput allows common type coercions, e.g., "10" -> 10 for int fields.
 	WeaklyTypedInput bool
@@ -24,8 +46,35 @@ type BindJSONOptions struct {
 }
 
 // BindJSON decodes the request body JSON into v.
-// If v is a pointer to a struct, behavior can be customized using an optional BindJSONOptions parameter.
-// Defaults: strict decoding (unknown fields rejected and collected), no type coercion.
+//
+// When v is a pointer to a struct, you may pass BindJSONOptions to control strictness
+// and coercion; otherwise, non-struct targets use the standard library's strict
+// behavior with DisallowUnknownFields.
+//
+// Default behavior (no options):
+//   - Unknown fields are reported as field errors
+//   - No weak typing (strings are not coerced into numbers, etc.)
+//
+// Field error mapping: common json.Decoder errors are converted into user-friendly
+// FieldErrors keyed by the offending json field.
+//
+// Examples:
+//
+//	// 1) Strict struct binding
+//	type Payload struct {
+//		Age int `json:"age"`
+//	}
+//	var p Payload
+//	if err := c.BindJSON(&p); err != nil {
+//		// Unknown fields => field error: {"extra": "unexpected field"}
+//	}
+//
+//	// 2) Permissive binding (coercion + allow unknown)
+//	_ = c.BindJSON(&p, BindJSONOptions{WeaklyTypedInput: true, ErrorUnused: false})
+//
+//	// 3) Non-struct target (map or slice)
+//	var m map[string]any
+//	_ = c.BindJSON(&m) // uses DisallowUnknownFields and returns raw json errors
 func (c *DefaultContext) BindJSON(v any, opts ...BindJSONOptions) error {
 	// Non-struct targets: keep strict json decoder behavior regardless of options.
 	rv := reflect.ValueOf(v)
@@ -49,8 +98,29 @@ func (c *DefaultContext) BindJSON(v any, opts ...BindJSONOptions) error {
 	return c.BindMap(v, m, opts...)
 }
 
-// BindMap binds fields from the provided map into v using map structure, honoring options.
+// BindMap binds fields from the provided map into v using mapstructure, honoring options.
 // TagName is "json" for all binders to keep a single source-of-truth for names.
+//
+// The map's keys must match the struct's `json` tag names (or field names if tag missing).
+// Type conversion behavior is governed by BindJSONOptions.WeaklyTypedInput.
+// Unknown key behavior is governed by BindJSONOptions.ErrorUnused.
+//
+// Examples:
+//
+//	type User struct {
+//		ID   int    `json:"id"`
+//		Name string `json:"name"`
+//	}
+//	m := map[string]any{"id": "10", "name": "Ada"}
+//	var u User
+//	// Coerce string to int
+//	_ = c.BindMap(&u, m, BindJSONOptions{WeaklyTypedInput: true})
+//
+//	// Strict mode rejects unknown fields
+//	m2 := map[string]any{"id": 1, "name": "Ada", "extra": true}
+//	if err := c.BindMap(&u, m2, BindJSONOptions{ErrorUnused: true}); err != nil {
+//		// err can be converted to FieldErrors indicating "extra" is unexpected
+//	}
 func (c *DefaultContext) BindMap(v any, m map[string]any, opts ...BindJSONOptions) error {
 	var o BindJSONOptions
 	if len(opts) > 0 {
@@ -86,6 +156,20 @@ func (c *DefaultContext) BindMap(v any, m map[string]any, opts ...BindJSONOption
 }
 
 // BindForm collects form body fields and binds them into v.
+// Supports application/x-www-form-urlencoded and multipart/form-data (textual fields only).
+//
+// For multipart/form-data, file uploads are ignored here; only textual values are bound.
+//
+// Examples:
+//
+//	// Content-Type: application/x-www-form-urlencoded
+//	// Body: name=Ada&age=33
+//	type Form struct { Name string `json:"name"`; Age int `json:"age"` }
+//	var f Form
+//	_ = c.BindForm(&f)
+//
+//	// Multipart: text fields collected from r.MultipartForm.Value
+//	_ = c.BindForm(&f)
 func (c *DefaultContext) BindForm(v any, opts ...BindJSONOptions) error {
 	m, err := c.collectFormMap()
 	if err != nil {
@@ -95,17 +179,52 @@ func (c *DefaultContext) BindForm(v any, opts ...BindJSONOptions) error {
 }
 
 // BindQuery collects query string parameters and binds them into v.
+// Only the first value per key is used, matching typical form semantics.
+//
+// Example:
+//
+//	// GET /search?q=flash&page=2
+//	type Q struct { Q string `json:"q"`; Page int `json:"page"` }
+//	var q Q
+//	_ = c.BindQuery(&q)
 func (c *DefaultContext) BindQuery(v any, opts ...BindJSONOptions) error {
 	return c.BindMap(v, c.collectQueryMap(), opts...)
 }
 
 // BindPath collects path parameters and binds them into v.
+// The keys correspond to route parameter names (e.g., ":id").
+//
+// Example:
+//
+//	// Route: /users/:id
+//	type P struct { ID int `json:"id"` }
+//	var p P
+//	_ = c.BindPath(&p)
 func (c *DefaultContext) BindPath(v any, opts ...BindJSONOptions) error {
 	return c.BindMap(v, c.collectPathMap(), opts...)
 }
 
 // BindAny merges values from query, body (Form then JSON), and path, and binds them into v.
 // Precedence (highest wins): Path > Body > Query, and within Body: JSON > Form.
+//
+// This is convenient for handlers that accept input from multiple sources while
+// maintaining a single struct definition.
+//
+// Examples:
+//
+//	// Route: /users/:id
+//	// Request: GET /users/10?active=true
+//	// Body: {"name":"Ada"}
+//	type In struct {
+//		ID     int    `json:"id"`
+//		Name   string `json:"name"`
+//		Active bool   `json:"active"`
+//	}
+//	var in In
+//	_ = c.BindAny(&in) // => ID=10 (path), Name="Ada" (json), Active=true (query)
+//
+//	// Form vs JSON precedence: JSON overrides Form for keys present in both
+//	// Body: name="A" (form) and {"name":"B"} (json) => name becomes "B"
 func (c *DefaultContext) BindAny(v any, opts ...BindJSONOptions) error {
 	// Pre-size map to reduce growth rehashing
 	est := len(c.r.URL.Query()) + len(c.params)

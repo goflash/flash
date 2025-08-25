@@ -18,22 +18,32 @@ func (e fieldSentinel) Error() string { return string(e) }
 // Sentinel errors to detect common field error categories with errors.Is.
 //
 // These values enable ergonomic detection of field-level validation/binding
-// issues returned by helpers (e.g., BindJSON). The messages of generated
-// FieldErrors remain human-friendly (e.g., "unexpected", "invalid type",
-// "int type expected"), while errors.Is can be used to check categories.
+// issues returned by helpers (e.g., BindJSON, BindMap, BindAny). The messages
+// of generated FieldErrors remain human-friendly (e.g., "unexpected",
+// "invalid type", "int type expected"), while errors.Is can be used to check
+// categories.
 //
-// Example:
+// Example (categorizing field errors):
 //
 //	var fe ctx.FieldErrors
 //	if errors.As(err, &fe) {
-//	    switch {
-//	    case errors.Is(fe, ctx.ErrFieldUnexpected):
-//	        // One or more fields were not expected
-//	    case errors.Is(fe, ctx.ErrFieldInvalidType):
-//	        // Type mismatch without a known expected type
-//	    case errors.Is(fe, ctx.ErrFieldTypeExpected):
-//	        // Type mismatch with an expected type (e.g., "int type expected")
+//	    if errors.Is(fe, ctx.ErrFieldUnexpected) {
+//	        // Unknown input keys were present
 //	    }
+//	    if errors.Is(fe, ctx.ErrFieldTypeExpected) {
+//	        // At least one field has a precise expected-type message
+//	    }
+//	}
+//
+// Example (surface messages to clients):
+//
+//	var fe ctx.FieldErrors
+//	if errors.As(err, &fe) {
+//	    out := map[string]string{}
+//	    for _, e := range fe.All() {
+//	        out[e.Field()] = e.Message() // e.g., {"age":"int type expected"}
+//	    }
+//	    _ = out
 //	}
 var (
 	// ErrFieldUnexpected matches unknown/unexpected input fields.
@@ -46,10 +56,11 @@ var (
 
 // FieldError represents a validation or binding error for a specific field.
 // Implementations provide a field path/name and a human-friendly message.
-// The same information can be obtained via Error(), but Field()/Message()
-// are convenient for structured handling in application code.
+// The same information can be obtained via Error(), but Field()/Message() are
+// convenient for structured handling in application code and for serializing
+// field-specific errors in APIs.
 //
-// Example:
+// Example (printing structured errors):
 //
 //	var fe ctx.FieldErrors
 //	if errors.As(err, &fe) {
@@ -62,12 +73,13 @@ type FieldError interface {
 	Message() string
 }
 
-// FieldErrors represents multiple field validation/binding errors.
+// FieldErrors represents multiple field validation/binding errors for a single
+// decoding/binding operation.
 //
-// FieldErrors satisfies the error interface. It also implements Is to
-// support errors.Is comparisons against the sentinel errors in this package.
+// FieldErrors satisfies the error interface. It also implements Is to support
+// errors.Is comparisons against the sentinel errors in this package.
 //
-// Example:
+// Example (group handling and iteration):
 //
 //	var fe ctx.FieldErrors
 //	if errors.As(err, &fe) {
@@ -102,7 +114,16 @@ func (f fieldErrorsMap) Error() string {
 }
 
 // Is enables errors.Is to detect sentinel field error categories on the aggregate.
-// It matches if any contained field error belongs to the requested category.
+// It matches true if any contained field error belongs to the requested category.
+// This powers expressions such as errors.Is(err, ErrFieldUnexpected) when err is
+// or wraps a FieldErrors value.
+//
+// Example:
+//
+//	var fe ctx.FieldErrors
+//	if errors.As(err, &fe) && errors.Is(fe, ctx.ErrFieldInvalidType) {
+//	    // At least one field had an invalid type
+//	}
 func (f fieldErrorsMap) Is(target error) bool {
 	// We match only against our sentinel type to avoid accidental string matches.
 	s, ok := target.(fieldSentinel)
@@ -134,6 +155,18 @@ func (f fieldErrorsMap) Is(target error) bool {
 
 // All returns the list of individual field errors contained in the aggregate.
 // Each entry exposes the field path/name and a human-friendly message.
+// The order is unspecified; callers should not rely on ordering semantics.
+//
+// Example:
+//
+//	var fe ctx.FieldErrors
+//	if errors.As(err, &fe) {
+//	    errs := map[string]string{}
+//	    for _, e := range fe.All() {
+//	        errs[e.Field()] = e.Message()
+//	    }
+//	    _ = errs
+//	}
 func (f fieldErrorsMap) All() []FieldError {
 	out := make([]FieldError, 0, len(f.m))
 	for k, v := range f.m {
@@ -142,10 +175,15 @@ func (f fieldErrorsMap) All() []FieldError {
 	return out
 }
 
-// fieldErrorsFromMap constructs a FieldErrors aggregate from a map of
-// field->message pairs. If the provided map is empty, it returns nil.
-// This helper is used internally to create structured field errors while
-// preserving simple, readable messages for end users.
+// fieldErrorsFromMap constructs a FieldErrors aggregate from field->message
+// pairs. If the provided map is empty, it returns nil.
+//
+// This helper is used internally by binders to create structured field errors
+// while preserving simple, readable messages for end users.
+//
+// Example (internal-style usage):
+//
+//	return fieldErrorsFromMap(map[string]string{"age": "int type expected"})
 func fieldErrorsFromMap(m map[string]string) FieldErrors {
 	if len(m) == 0 {
 		return nil
