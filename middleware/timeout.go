@@ -11,10 +11,32 @@ import (
 )
 
 // TimeoutConfig configures the timeout middleware.
-// Duration sets the timeout. OnTimeout is called when a timeout occurs. ErrorResponse can customize the timeout response.
+//
+// Security and performance considerations:
+//   - Duration: Set reasonable timeouts to prevent resource exhaustion (default: 5s)
+//   - OnTimeout: Use for logging and cleanup, avoid blocking operations
+//   - ErrorResponse: Custom timeout responses, should not leak sensitive information
+//
+// Note: For request size limiting, use the dedicated RequestSize middleware instead.
+//
+// Example:
+//
+//	cfg := middleware.TimeoutConfig{
+//		Duration: 30 * time.Second,
+//		OnTimeout: func(c flash.Ctx) {
+//			log.Printf("Request timeout: %s %s", c.Method(), c.Path())
+//		},
+//		ErrorResponse: func(c flash.Ctx) error {
+//			return c.JSON(http.StatusGatewayTimeout, map[string]string{
+//				"error": "Request timeout",
+//				"code":  "TIMEOUT",
+//			})
+//		},
+//	}
+//	app.Use(middleware.Timeout(cfg))
 type TimeoutConfig struct {
-	Duration      time.Duration         // request timeout duration
-	OnTimeout     func(flash.Ctx)       // optional callback on timeout
+	Duration      time.Duration         // request timeout duration (default: 5s)
+	OnTimeout     func(flash.Ctx)       // optional callback on timeout (should be non-blocking)
 	ErrorResponse func(flash.Ctx) error // optional custom error response
 }
 
@@ -142,12 +164,54 @@ func (tr *timeoutResponder) Write(b []byte) (int, error) {
 	return tr.tw.w.Write(b)
 }
 
-// Timeout returns middleware that applies a timeout to the request context.
-// If the handler does not complete within Duration, a 504 Gateway Timeout is returned.
+// Timeout returns middleware that applies a timeout to the request context with enhanced security features.
+//
+// Security Features:
+//   - Proper context cancellation to prevent goroutine leaks
+//   - Safe timeout handling with race condition prevention
+//   - Protected timeout callbacks to prevent secondary failures
+//
+// Performance Features:
+//   - Efficient goroutine management with proper cleanup
+//   - Minimal overhead for requests that complete within timeout
+//   - Optimized header handling to reduce allocations
+//
+// Example Usage:
+//
+//	// Basic timeout
+//	app.Use(middleware.Timeout(middleware.TimeoutConfig{
+//		Duration: 30 * time.Second,
+//	}))
+//
+//	// With longer timeout for slow operations
+//	app.Use(middleware.Timeout(middleware.TimeoutConfig{
+//		Duration: 60 * time.Second, // 1 minute for file processing
+//	}))
+//
+//	// With custom timeout handling
+//	app.Use(middleware.Timeout(middleware.TimeoutConfig{
+//		Duration: 30 * time.Second,
+//		OnTimeout: func(c flash.Ctx) {
+//			// Log timeout (non-blocking)
+//			go func() {
+//				log.Printf("Request timeout: %s %s from %s",
+//					c.Method(), c.Path(), c.Request().RemoteAddr)
+//			}()
+//		},
+//		ErrorResponse: func(c flash.Ctx) error {
+//			return c.JSON(http.StatusGatewayTimeout, map[string]interface{}{
+//				"error":   "Request timeout",
+//				"code":    "GATEWAY_TIMEOUT",
+//				"timeout": "30s",
+//			})
+//		},
+//	}))
 func Timeout(cfg TimeoutConfig) flash.Middleware {
+	// Set secure defaults
 	if cfg.Duration <= 0 {
 		cfg.Duration = 5 * time.Second
 	}
+
 	return func(next flash.Handler) flash.Handler {
 		return func(c flash.Ctx) error {
 			ctx, cancel := context.WithTimeout(c.Context(), cfg.Duration)
@@ -163,7 +227,15 @@ func Timeout(cfg TimeoutConfig) flash.Middleware {
 			copyCtx.SetRequest(c.Request())
 
 			done := make(chan error, 1)
-			go func() { done <- next(copyCtx) }()
+			go func() {
+				defer func() {
+					// Ensure we always send something to done channel to prevent goroutine leak
+					if r := recover(); r != nil {
+						done <- http.ErrAbortHandler
+					}
+				}()
+				done <- next(copyCtx)
+			}()
 
 			select {
 			case err := <-done:
@@ -178,16 +250,24 @@ func Timeout(cfg TimeoutConfig) flash.Middleware {
 				// Route timeout response through timeoutResponder to serialize writes
 				tr := newTimeoutResponder(tw)
 				c.SetResponseWriter(tr)
+
+				// Execute timeout callback - run synchronously but with panic protection
 				if cfg.OnTimeout != nil {
-					cfg.OnTimeout(c)
+					func() {
+						defer func() { recover() }() // Protect against panics in user code
+						cfg.OnTimeout(c)
+					}()
 				}
+
 				if cfg.ErrorResponse != nil {
 					return cfg.ErrorResponse(c)
 				}
-				// Default 504 response without sharing handler headers
-				body := http.StatusText(http.StatusGatewayTimeout)
+
+				// Default secure 504 response without leaking information
+				body := "Gateway Timeout"
 				tr.Header().Set("Content-Type", "text/plain; charset=utf-8")
 				tr.Header().Set("Content-Length", strconv.Itoa(len(body)))
+				tr.Header().Set("X-Content-Type-Options", "nosniff") // Security header
 				tr.WriteHeader(http.StatusGatewayTimeout)
 				_, _ = tr.Write([]byte(body))
 				return nil
