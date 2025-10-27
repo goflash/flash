@@ -1,19 +1,19 @@
 module github.com/goflash/flash/v2
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/json-iterator/go v1.1.12
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.11.0
-	github.com/valyala/fasthttp v1.51.0
+	github.com/valyala/fasthttp v1.68.0
 )
 
 require (
-	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/klauspost/compress v1.17.0 // indirect
+	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
